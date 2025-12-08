@@ -1,0 +1,35 @@
+server:
+  port: 8082
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    gateway:
+      routes:
+      - id: adminservice
+        predicates:
+        - Path=/adminservice/**
+        uri: lb://adminservice
+        filters:
+        - RoleAuth=ADMIN
+      - id: bookingservice
+        predicates:
+        - Path=/bookingservice/**
+        uri: lb://bookingservice
+        filters:
+        - RoleAuth=ADMIN,USER
+  main:
+    allow-bean-definition-overriding: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:9000
+          jwk-set-uri: http://localhost:9000/oauth2/jwks
+eureka:
+  client:
+    service-url:
+      defaultZone: ${eureka_url:http://localhost:8888/eureka}
+  instance:
+    lease-renewal-interval-in-seconds: 1
+    lease-expiration-duration-in-seconds: 2

@@ -1,0 +1,7 @@
+{
+  "/generateToken/v1/*": {
+    "target": "http://localhost:9000",
+    "secure": false,
+    "changeOrigin": false
+  }
+}

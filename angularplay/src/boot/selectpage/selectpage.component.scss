@@ -1,0 +1,12 @@
+.btn {
+  padding: 50px;
+}
+nav {
+  display: flex;
+  justify-content: space-evenly;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  width: 100%;
+}
