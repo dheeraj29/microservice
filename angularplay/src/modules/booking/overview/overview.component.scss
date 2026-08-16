@@ -1,0 +1,497 @@
+.booking-portal-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.portal-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+
+  .header-titles {
+    h2 { font-size: 1.8rem; }
+    .subtitle { color: var(--text-secondary); font-size: 0.95rem; }
+  }
+
+  .tab-switcher {
+    display: flex;
+    background: rgba(15, 23, 42, 0.8);
+    padding: 0.3rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.6rem 1.25rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+
+      &.active {
+        background: var(--primary);
+        color: #ffffff;
+        box-shadow: 0 4px 12px var(--primary-glow);
+      }
+    }
+  }
+}
+
+// Search Bar Card
+.search-bar-card {
+  padding: 1.25rem 1.75rem;
+
+  .search-fields-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1.5fr 1.2fr 1fr;
+    gap: 1.25rem;
+    align-items: flex-end;
+  }
+}
+
+// Bus Layout Grid
+.booking-layout-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  transition: all 0.3s ease;
+
+  &.with-seat-selector {
+    grid-template-columns: 1.2fr 1fr;
+  }
+}
+
+// Bus Listings
+.bus-list-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  .column-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    h3 { font-size: 1.25rem; }
+  }
+
+  .buses-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .bus-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 1.75rem;
+    cursor: pointer;
+    border: 1px solid var(--border-subtle);
+
+    &:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+    }
+
+    &.bus-card-selected {
+      border-color: var(--primary);
+      background: rgba(99, 102, 241, 0.12);
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+    }
+
+    .bus-main-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+
+      .bus-badge-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        .bus-type { font-size: 0.8rem; color: var(--text-muted); }
+      }
+
+      .route-timeline {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+
+        .timeline-point {
+          display: flex;
+          flex-direction: column;
+          .time { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+          .location { font-size: 0.85rem; color: var(--text-secondary); }
+        }
+
+        .timeline-path {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.25rem;
+          color: var(--text-muted);
+
+          .path-line {
+            width: 80px;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.15);
+            position: relative;
+          }
+          i { font-size: 0.9rem; color: var(--primary); }
+          .duration { font-size: 0.75rem; font-weight: 500; }
+        }
+      }
+    }
+
+    .bus-pricing-action {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.75rem;
+
+      .price-box {
+        .currency { font-size: 1.1rem; color: var(--accent-emerald); font-weight: 700; }
+        .amount { font-size: 1.75rem; font-weight: 800; color: #ffffff; }
+        .per-seat { font-size: 0.8rem; color: var(--text-muted); }
+      }
+    }
+  }
+}
+
+// 2x2 VISUAL BUS SEAT SELECTOR
+.seat-selector-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.75rem;
+  background: #0f172a;
+  border-color: var(--border-highlight);
+
+  .selector-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-subtle);
+
+    h3 { font-size: 1.2rem; }
+    p { font-size: 0.85rem; }
+  }
+
+  .seat-legend {
+    display: flex;
+    justify-content: space-around;
+    padding: 0.6rem;
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 600;
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+
+      .seat-sample {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+
+        &.available { background: rgba(51, 65, 85, 0.8); border: 1px solid var(--border-subtle); }
+        &.selected { background: var(--primary); }
+        &.occupied { background: rgba(244, 63, 94, 0.3); border: 1px solid rgba(244, 63, 94, 0.4); }
+      }
+    }
+  }
+
+  // Graphical Bus Cabin
+  .bus-cabin-wrapper {
+    background: rgba(15, 23, 42, 0.9);
+    border: 2px solid var(--border-subtle);
+    border-radius: 28px 28px 12px 12px;
+    padding: 1.25rem;
+    max-height: 420px;
+    overflow-y: auto;
+
+    .driver-cabin {
+      display: flex;
+      justify-content: space-between;
+      padding-bottom: 1rem;
+      margin-bottom: 1rem;
+      border-bottom: 2px dashed rgba(255, 255, 255, 0.1);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+
+      .driver-icon i { color: #f59e0b; }
+      .door-icon i { color: var(--accent-emerald); }
+    }
+
+    .seats-matrix {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.65rem;
+
+      // Add middle aisle gap between column 2 and 3
+      .seat-box:nth-child(4n-1) {
+        margin-left: 0.75rem;
+      }
+
+      .seat-box {
+        aspect-ratio: 1;
+        background: rgba(51, 65, 85, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+
+        .seat-icon { font-size: 0.9rem; color: var(--text-muted); }
+        .seat-text { font-size: 0.75rem; font-weight: 700; }
+
+        &:hover.available {
+          border-color: var(--primary);
+          background: rgba(99, 102, 241, 0.3);
+          transform: scale(1.05);
+        }
+
+        &.selected {
+          background: linear-gradient(135deg, var(--primary) 0%, #4338ca 100%);
+          border-color: #818cf8;
+          color: #ffffff;
+          box-shadow: 0 0 10px var(--primary-glow);
+          .seat-icon { color: #ffffff; }
+        }
+
+        &.occupied {
+          background: rgba(244, 63, 94, 0.12);
+          border-color: rgba(244, 63, 94, 0.25);
+          color: rgba(244, 63, 94, 0.5);
+          cursor: not-allowed;
+          .seat-icon { color: rgba(244, 63, 94, 0.4); }
+        }
+      }
+    }
+  }
+
+  // Summary & Checkout
+  .checkout-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-subtle);
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
+
+      .selected-seats-pills {
+        display: flex;
+        gap: 0.3rem;
+        flex-wrap: wrap;
+      }
+
+      &.total-row {
+        font-size: 1.1rem;
+        font-weight: 700;
+        .total-price { color: var(--accent-emerald); font-size: 1.35rem; }
+      }
+    }
+  }
+}
+
+// My Bookings Tab Grid
+.my-bookings-container {
+  .bookings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .booking-ticket-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.5rem;
+    border: 1px solid var(--border-subtle);
+
+    .ticket-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .booking-ref {
+        display: flex;
+        flex-direction: column;
+        .label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); }
+        .id-val { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 800; color: var(--primary); }
+      }
+    }
+
+    .ticket-route {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.85rem 1rem;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: var(--radius-sm);
+
+      .route-city {
+        display: flex;
+        flex-direction: column;
+        .city-name { font-size: 1.1rem; font-weight: 700; }
+        .city-sub { font-size: 0.75rem; color: var(--text-muted); }
+      }
+
+      .route-arrow {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        color: var(--primary);
+        font-size: 1rem;
+        .coach-num { font-size: 0.75rem; color: var(--text-muted); }
+      }
+    }
+
+    .ticket-details-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      font-size: 0.85rem;
+
+      .detail-item {
+        display: flex;
+        flex-direction: column;
+        .detail-label { font-size: 0.7rem; color: var(--text-muted); }
+        .detail-val { font-weight: 600; }
+      }
+    }
+
+    .ticket-actions {
+      display: flex;
+      gap: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border-subtle);
+
+      button { flex: 1; }
+    }
+  }
+}
+
+// Digital Boarding Pass Styling
+.boarding-pass-modal {
+  max-width: 500px !important;
+
+  .boarding-pass-card {
+    background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+    border: 2px dashed rgba(99, 102, 241, 0.4);
+    border-radius: var(--radius-md);
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+
+    .pass-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-heading);
+
+      .pass-brand { font-size: 1.1rem; font-weight: 800; color: #818cf8; }
+      .pass-class { font-size: 0.75rem; font-weight: 700; background: rgba(245, 158, 11, 0.2); color: #fbbf24; padding: 0.2rem 0.6rem; border-radius: 4px; }
+    }
+
+    .pass-route {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      h2 { font-size: 1.4rem; color: #ffffff; }
+      span { font-size: 0.75rem; color: #a5b4fc; }
+      .pass-bus-icon { font-size: 1.5rem; color: #818cf8; }
+    }
+
+    .pass-divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .pass-info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+
+      .lbl { display: block; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); }
+      .val { font-size: 0.95rem; font-weight: 700; color: #ffffff; }
+    }
+
+    .qr-code-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      padding-top: 0.5rem;
+
+      .simulated-qr {
+        font-size: 4.5rem;
+        color: #ffffff;
+        line-height: 1;
+      }
+      .qr-label { font-size: 0.75rem; color: var(--text-muted); }
+    }
+  }
+}
+
+// Loading & Empty States
+.loading-state, .empty-state {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+
+  i { font-size: 2.5rem; color: var(--primary); }
+  .spin-icon { animation: spin 1s linear infinite; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.success-check-icon {
+  font-size: 3.5rem;
+  color: var(--accent-emerald);
+  margin-bottom: 0.5rem;
+}
+
+// Responsiveness
+@media (max-width: 992px) {
+  .search-bar-card .search-fields-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .booking-layout-grid.with-seat-selector {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 576px) {
+  .search-bar-card .search-fields-grid {
+    grid-template-columns: 1fr;
+  }
+}

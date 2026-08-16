@@ -1,21 +1,12 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { AuthGuard } from '../services/loginhandler.service';
+import { AuthGuard, AdminGuard } from '../services/loginhandler.service';
 import { SelectpageComponent } from './selectpage/selectpage.component';
+import { CallbackComponent } from './callback/callback.component';
 
 const routes: Routes = [
   {
-    path: 'admin',
-    loadChildren: () =>
-      import(`../modules/admin/admin.module`).then((m) => m.AdminModule), canActivate: [AuthGuard]
-  },
-  {
-    path: 'booking',
-    loadChildren: () =>
-      import(`../modules/booking/booking.module`).then((m) => m.BookingModule),
-  },
-  {
-    path: 'callback',
+    path: '',
     component: SelectpageComponent
   },
   {
@@ -23,15 +14,29 @@ const routes: Routes = [
     component: SelectpageComponent
   },
   {
-    path: '',
-    component: SelectpageComponent
+    path: 'callback',
+    component: CallbackComponent
+  },
+  {
+    path: 'booking',
+    loadChildren: () =>
+      import('../modules/booking/booking.module').then((m) => m.BookingModule),
+    canActivate: [AuthGuard]
+  },
+  {
+    path: 'admin',
+    loadChildren: () =>
+      import('../modules/admin/admin.module').then((m) => m.AdminModule),
+    canActivate: [AdminGuard]
+  },
+  {
+    path: '**',
+    redirectTo: ''
   }
 ];
 
 @NgModule({
-  imports: [RouterModule.forRoot(routes)
-  ],
-  exports: [RouterModule
-  ]
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
 })
 export class AppRoutingModule { }

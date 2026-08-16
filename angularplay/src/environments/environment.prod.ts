@@ -1,7 +1,7 @@
 export const environment = {
     production: true,
-    API_URL: 'http://localhost:8082',
-    AUTH_URL: 'http://localhost:9000',
-    CLIENT_ID: 'gateway-client-id',
+    API_URL: 'http://localhost:8080',
+    AUTH_URL: 'http://localhost:8088/realms/bus-reservation',
+    CLIENT_ID: 'angular-client',
     REDIRECT_URL: 'http://localhost:4200/callback'
 };

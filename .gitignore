@@ -1,41 +1,92 @@
-**/HELP.md
+# ==============================================================================
+# OmniBus Microservices Platform - Comprehensive .gitignore
+# ==============================================================================
+
+# --- Local Tools & Binaries ---
+tools/
+*.tar.gz
+*.zip
+*.rar
+
+# --- Maven & Build Artifacts ---
 **/target/
-**/.mvn
-!**/**/src/main/**/target/
-!**/**/src/test/**/target/
-
-### STS ###
-**/.apt_generated
-**/.classpath
-**/.factorypath
-**/.project
-**/.settings
-**/.springBeans
-**/.sts4-cache
-
-### IntelliJ IDEA ###
-**/.idea
-**/*.iws
-**/*.iml
-**/*.ipr
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
 **/build/
-!**/**/src/main/**/build/
-!**/**/src/test/**/build/
+**/dist/
+.mvn/
+!**/src/main/**/target/
+!**/src/test/**/target/
+!**/src/main/**/build/
+!**/src/test/**/build/
+**/HELP.md
 
-### VS Code ###
-**/.vscode/
-
-**/mvnw
-**/mvnw.cmd
-
+# --- Node & Angular ---
 **/node_modules/
-**/package-lock.json
 **/.angular/
-**/.vscode/
+**/.angular-errors/
+**/package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.pnpm-store/
+
+# --- Logs & JVM Crash Dumps ---
+*.log
+**/logs/
+hs_err_pid*
+replay_pid*
+*.hprof
+
+# --- Embedded Databases (H2, Valkey/Redis Dumps) ---
+*.mv.db
+*.trace.db
+*.rdb
+dump.rdb
+
+# --- Environment Files & Secrets ---
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.jks
+*.pfx
+
+# --- IDEs & Editors ---
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Eclipse / Spring Tool Suite (STS)
+.apt_generated/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# NetBeans
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# --- OS System Files ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini

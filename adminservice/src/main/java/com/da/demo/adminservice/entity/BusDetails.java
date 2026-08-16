@@ -19,6 +19,9 @@ public class BusDetails {
 	
 	@Column(name="price",nullable=false)
 	String price;
+
+	@Column(name="totalSeats")
+	String totalSeats = "40";
 	
 	public int getBusNumber() {
 		return busNumber;
@@ -50,5 +53,13 @@ public class BusDetails {
 
 	public void setPrice(String price) {
 		this.price = price;
+	}
+
+	public String getTotalSeats() {
+		return totalSeats != null ? totalSeats : "40";
+	}
+
+	public void setTotalSeats(String totalSeats) {
+		this.totalSeats = totalSeats;
 	}
 }

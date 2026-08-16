@@ -1,0 +1,8 @@
+apiVersion: v2
+name: bus-reservation
+description: Production-Ready Cloud-Native Helm Chart for Bus Reservation System with Keycloak, Valkey, Envoy Gateway, and Spring Boot Microservices
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+maintainers:
+  - name: Platform Architecture Team

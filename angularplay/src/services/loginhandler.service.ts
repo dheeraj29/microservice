@@ -1,61 +1,126 @@
-import { Injectable, inject } from '@angular/core';
-import { ActivatedRouteSnapshot, CanActivateFn, RouterStateSnapshot } from '@angular/router';
-import { environment } from '../environments/environment';
+import { Injectable, inject, signal, computed } from '@angular/core';
+import { ActivatedRouteSnapshot, CanActivateFn, Router, RouterStateSnapshot } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { Observable, catchError, map, of, tap } from 'rxjs';
+
+export interface UserProfile {
+  username: string;
+  fullName: string;
+  email: string;
+  roles: string[];
+}
+
+export interface BffUserResponse {
+  authenticated: boolean;
+  username: string;
+  roles: string[];
+  isAdmin: boolean;
+}
 
 @Injectable({
   providedIn: 'root'
 })
-export class LoginhandlerService {
+export class UserService {
+  private http = inject(HttpClient);
+  private router = inject(Router);
 
-  async canActivate(next: ActivatedRouteSnapshot, state: RouterStateSnapshot) {
-    if(localStorage.getItem("__access__")) {
-      return true;
-    } else {
-      const gen_challenge = this.generatePKCEPair();
-      gen_challenge.then((code_challenge) => {
-        window.location.href=environment.AUTH_URL+"/oauth2/authorize?response_type=code&client_id="+environment.CLIENT_ID+"&redirect_uri="+encodeURIComponent(environment.REDIRECT_URL)+"&code_challenge="+code_challenge+"&code_challenge_method=S256&state="+state.url;
-      });
+  // Relative path ensures same-origin cookie transmission via proxy
+  readonly bffAuthUrl = '/auth';
+
+  // Current User Signal
+  currentUser = signal<UserProfile | null>(null);
+  isInitializing = signal<boolean>(true);
+
+  isAuthenticated = computed(() => this.currentUser() !== null);
+  isAdmin = computed(() => this.hasRole('ADMIN') || this.hasRole('ROLE_ADMIN'));
+  isUser = computed(() => this.hasRole('USER') || this.hasRole('ROLE_USER'));
+
+  constructor() {
+    this.restoreSession().subscribe();
+  }
+
+  // Redirect to BFF Gateway Login -> Keycloak OIDC (prompt=login forced)
+  loginWithKeycloak() {
+    window.location.href = `${this.bffAuthUrl}/login`;
+  }
+
+  // Restore authenticated session via BFF Gateway HttpOnly Cookie
+  restoreSession(): Observable<boolean> {
+    return this.http.get<BffUserResponse>(`${this.bffAuthUrl}/user`, { withCredentials: true }).pipe(
+      tap((res) => {
+        this.isInitializing.set(false);
+        if (res && res.authenticated) {
+          this.currentUser.set({
+            username: res.username,
+            fullName: res.username,
+            email: '',
+            roles: res.roles || []
+          });
+        } else {
+          this.currentUser.set(null);
+        }
+      }),
+      map((res) => !!(res && res.authenticated)),
+      catchError(() => {
+        this.isInitializing.set(false);
+        this.currentUser.set(null);
+        return of(false);
+      })
+    );
+  }
+
+  hasRole(role: string): boolean {
+    const user = this.currentUser();
+    if (!user || !user.roles) return false;
+    const normalized = role.toUpperCase();
+    return user.roles.some(r => r.toUpperCase() === normalized || r.toUpperCase() === `ROLE_${normalized}`);
+  }
+
+  logout() {
+    this.currentUser.set(null);
+    window.location.href = `${this.bffAuthUrl}/logout`;
+  }
+}
+
+export const AuthGuard: CanActivateFn = (next: ActivatedRouteSnapshot, state: RouterStateSnapshot): Observable<boolean> | boolean => {
+  const userService = inject(UserService);
+
+  if (userService.isAuthenticated()) {
+    return true;
+  }
+
+  return userService.restoreSession().pipe(
+    map(isAuth => {
+      if (isAuth) {
+        return true;
+      }
+      userService.loginWithKeycloak();
       return false;
-    }
+    })
+  );
+};
+
+export const AdminGuard: CanActivateFn = (next: ActivatedRouteSnapshot, state: RouterStateSnapshot): Observable<boolean> | boolean => {
+  const userService = inject(UserService);
+  const router = inject(Router);
+
+  if (userService.isAuthenticated()) {
+    if (userService.isAdmin()) return true;
+    router.navigate(['/booking']);
+    return false;
   }
 
-  private async generatePKCEPair() {
-    const NUM_OF_BYTES = Math.floor(Math.random() * (128 - 43 + 1) + 43); // Total of 44 characters (1 Bytes = 2 char) (standard states that: 43 chars <= verifier <= 128 chars)
-    //let array = new Uint8Array(NUM_OF_BYTES/2);
-    //window.crypto.getRandomValues(array);
-    //const challenge_verify = Array.from(array, this.dec2hex).join('');
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-    let counter = Math.floor(NUM_OF_BYTES/2) - 1;
-    let challenge_verify = "";
-    while (counter >= 0) {
-      challenge_verify += characters.charAt(Math.floor(Math.random() * characters.length));
-      counter -= 1;
-    }
-    
-    const code_hash = await this.sha256(challenge_verify);
-    const base64Encoded = this.base64urlencode(code_hash);
-    document.cookie = "challenge="+challenge_verify+"; Path=/callback"+"; SameSite=Strict";
-    return base64Encoded;
-  }
-
-  private dec2hex(dec: number) {
-    return dec.toString(16);
-  }
-
-  private sha256(plain: string) { // returns promise ArrayBuffer
-    const encoder = new TextEncoder();
-    const data = encoder.encode(plain);
-    return window.crypto.subtle.digest('SHA-256', data);
-  }
-
-  private base64urlencode(hash: ArrayBuffer) {
-    // (replace + with -, replace / with _, trim trailing =)
-    return btoa(String.fromCharCode(...new Uint8Array(hash)))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-
-}
-
-export const AuthGuard: CanActivateFn = (next: ActivatedRouteSnapshot, state: RouterStateSnapshot): Promise<boolean> => {
-  return inject(LoginhandlerService).canActivate(next, state);
-}
+  return userService.restoreSession().pipe(
+    map(isAuth => {
+      if (isAuth && userService.isAdmin()) {
+        return true;
+      }
+      if (isAuth) {
+        router.navigate(['/booking']);
+        return false;
+      }
+      userService.loginWithKeycloak();
+      return false;
+    })
+  );
+};

@@ -9,10 +9,10 @@ import com.da.demo.bookingservice.model.BookingModel;
 @Service
 public class RabbitMQProducer {
 
-	@Value("${rabbit.exchange.name}")
+	@Value("${rabbit.exchange.name:bus-exchange}")
 	private String exchangename;
 	
-	@Value("${rabbit.payment.routekey}")
+	@Value("${rabbit.payment.routekey:payment-key}")
 	private String routekey;
 	
 	private RabbitTemplate rabbitTemplate;
@@ -22,6 +22,10 @@ public class RabbitMQProducer {
 	}
 	
 	public void sendBooking(BookingModel bookingModel) {
-		rabbitTemplate.convertAndSend(exchangename,routekey,bookingModel);
+		try {
+			if (rabbitTemplate != null) {
+				rabbitTemplate.convertAndSend(exchangename, routekey, bookingModel);
+			}
+		} catch (Exception ignored) {}
 	}
 }

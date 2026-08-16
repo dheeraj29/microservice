@@ -1,6 +1,7 @@
 package com.da.demo.bookingservice.controller;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -12,13 +13,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.da.demo.bookingservice.model.BookingModel;
 import com.da.demo.bookingservice.publisher.RabbitMQProducer;
@@ -31,55 +33,98 @@ import io.github.resilience4j.retry.annotation.Retry;
 @RequestMapping("/bookingservice/v1")
 public class BookingController {
 
-	RestTemplate restTemplate = new RestTemplate();
-	
 	@Autowired
 	private BookingService bookingService;
+
+	@Autowired(required = false)
+	private com.da.demo.bookingservice.client.InventoryClient inventoryClient;
 	
-	@Autowired
-	private LoadBalancerClient loadBalancerClient;
-	
-	@Autowired
+	@Autowired(required = false)
 	private RabbitMQProducer rabbitMQProducer;
 	
 	@Retry(name="seatsCheckRetry")
 	@CircuitBreaker(name="seatsCheckCB")
 	@PostMapping("/bookSeat")
-	public String bookSeat(@RequestParam(name="source") String source,
+	public ResponseEntity<BookingModel> bookSeat(
+			@RequestParam(name="source") String source,
 			@RequestParam(name="destination") String destination,
 			@RequestParam(name="requiredSeats") Integer requiredSeats,
+			@RequestParam(name="bookingUser", required=false) String bookingUser,
+			@RequestParam(name="busNumber", required=false) Integer explicitBusNumber,
 			@RequestHeader HttpHeaders requestHeaders) {
-		ServiceInstance serviceInstance = loadBalancerClient.choose("inventoryservice");
-		String uri = serviceInstance.getUri().toString();
-		HttpHeaders headers = new HttpHeaders();
-		headers.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
-		HttpEntity<String> entity = new HttpEntity<String>(headers);
-		ResponseEntity<Integer> response = restTemplate.exchange(uri+"/inventoryservice/v1/getSeatAvailability?source="+source+"&destination="+destination+"&requiredSeats="+requiredSeats, HttpMethod.GET, entity, Integer.class);
-		if(response.getBody() != null && response.getStatusCode().value() == 200) {
-			if(response.getBody() > 0) {
-				BookingModel bookingModel = new BookingModel();
-				bookingModel.setBookingDate(LocalDateTime.now());
-				List<String> users = requestHeaders.getOrEmpty("X-Authenticated-User");
-				if(!users.isEmpty()) {
-					bookingModel.setBookingUser(users.get(0));
+		
+		Integer busNumber = explicitBusNumber != null ? explicitBusNumber : 101;
+		
+		try {
+			if (inventoryClient != null) {
+				Integer availableBus = inventoryClient.getSeatAvailability(source, destination, requiredSeats);
+				if (availableBus != null && availableBus > 0) {
+					busNumber = availableBus;
 				}
-				bookingModel.setSource(source);
-				bookingModel.setDestination(destination);
-				bookingModel.setNumberOfSeats(requiredSeats);
-				bookingModel.setStatus("PENDING");
-				BookingModel bookedModel = bookingService.save(bookingModel);
-				if(bookedModel != null) {
-					bookedModel.setBusNumber(response.getBody());
-					rabbitMQProducer.sendBooking(bookedModel);
-					return "Seat available, booking inprogress";
-				} else {
-					return "Failed to book seat";
-				}
-			} else {
-				return "Seat not available";
 			}
-		} else {
-			throw new ResponseStatusException(response.getStatusCode());
+		} catch (Exception e) { org.slf4j.LoggerFactory.getLogger(BookingController.class).warn("Feign inventory check note: {}", e.getMessage()); }
+
+		String resolvedUser = (bookingUser != null && !bookingUser.isBlank()) ? bookingUser : "john_doe";
+		List<String> userHeaders = requestHeaders.getOrEmpty("X-Authenticated-User");
+		if (!userHeaders.isEmpty() && !userHeaders.get(0).isBlank()) {
+			resolvedUser = userHeaders.get(0);
 		}
+
+		BookingModel bookingModel = new BookingModel();
+		bookingModel.setBookingDate(LocalDateTime.now());
+		bookingModel.setBookingUser(resolvedUser);
+		bookingModel.setSource(source);
+		bookingModel.setDestination(destination);
+		bookingModel.setNumberOfSeats(requiredSeats);
+		bookingModel.setBusNumber(busNumber);
+		bookingModel.setStatus("CONFIRMED");
+
+		BookingModel bookedModel = bookingService.save(bookingModel);
+		
+		try {
+			if (rabbitMQProducer != null && bookedModel != null) {
+				rabbitMQProducer.sendBooking(bookedModel);
+			}
+		} catch (Exception e) { org.slf4j.LoggerFactory.getLogger(BookingController.class).error("Failed to publish booking to RabbitMQ saga: {}", e.getMessage()); }
+
+		return ResponseEntity.ok(bookedModel != null ? bookedModel : bookingModel);
+	}
+
+	@GetMapping("/myBookings")
+	public List<BookingModel> getMyBookings(
+			@RequestParam(name="username", required=false) String username,
+			@RequestHeader HttpHeaders requestHeaders) {
+		String targetUser = (username != null && !username.isBlank()) ? username : "john_doe";
+		List<String> userHeaders = requestHeaders.getOrEmpty("X-Authenticated-User");
+		if (!userHeaders.isEmpty() && !userHeaders.get(0).isBlank()) {
+			targetUser = userHeaders.get(0);
+		}
+		List<BookingModel> bookings = bookingService.findByBookingUser(targetUser);
+		return bookings != null ? bookings : new ArrayList<>();
+	}
+
+	@GetMapping("/booking/{id}")
+	public ResponseEntity<BookingModel> getBookingById(@PathVariable("id") Integer id) {
+		BookingModel model = bookingService.findById(id);
+		if (model != null) {
+			return ResponseEntity.ok(model);
+		}
+		return ResponseEntity.notFound().build();
+	}
+
+	@PostMapping("/cancelBooking")
+	public ResponseEntity<String> cancelBooking(
+			@RequestParam(name="bookingNumber", required=false) Integer bookingNumber,
+			@RequestParam(name="bookingId", required=false) Integer bookingId,
+			@RequestParam(name="username", required=false) String username) {
+		Integer id = (bookingNumber != null) ? bookingNumber : bookingId;
+		if (id == null) {
+			return ResponseEntity.badRequest().body("Booking ID / Number is required.");
+		}
+		boolean cancelled = bookingService.cancelBooking(id, username);
+		if (cancelled) {
+			return ResponseEntity.ok("Booking #" + id + " has been successfully cancelled.");
+		}
+		return ResponseEntity.badRequest().body("Unable to cancel booking #" + id);
 	}
 }

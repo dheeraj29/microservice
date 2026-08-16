@@ -1,2 +1,394 @@
-<p>overview works!</p>
-<button class="btn btn-primary" (click)="backNavigation()">Go Back</button>
+<div class="booking-portal-container">
+  <!-- Toast Notification -->
+  @if (toastMessage()) {
+    <div class="toast-alert" [class.toast-success]="toastMessage()?.type === 'success'" [class.toast-error]="toastMessage()?.type === 'error'">
+      <i class="bi" [class.bi-check-circle-fill]="toastMessage()?.type === 'success'" [class.bi-exclamation-triangle-fill]="toastMessage()?.type === 'error'"></i>
+      <span>{{ toastMessage()?.text }}</span>
+    </div>
+  }
+
+  <!-- Header & Tab Navigation -->
+  <div class="portal-header-bar">
+    <div class="header-titles">
+      <h2>Bus Ticket Reservation</h2>
+      <p class="subtitle">Search live intercity routes, select your seats, and manage boarding passes.</p>
+    </div>
+
+    <div class="tab-switcher">
+      <button 
+        type="button" 
+        class="tab-btn" 
+        [class.active]="activeTab() === 'SEARCH'"
+        (click)="setTab('SEARCH')">
+        <i class="bi bi-search"></i> Search Coaches
+      </button>
+      <button 
+        type="button" 
+        class="tab-btn" 
+        [class.active]="activeTab() === 'MY_BOOKINGS'"
+        (click)="setTab('MY_BOOKINGS')">
+        <i class="bi bi-ticket-detailed"></i> My Trips ({{ myBookings().length }})
+      </button>
+    </div>
+  </div>
+
+  <!-- TAB 1: SEARCH & BOOK -->
+  @if (activeTab() === 'SEARCH') {
+    <!-- Search Bar Card -->
+    <div class="search-bar-card glass-card">
+      <div class="search-fields-grid">
+        <div class="form-group mb-0">
+          <label><i class="bi bi-geo-alt-fill text-indigo"></i> Origin (From)</label>
+          <input type="text" class="form-control" [(ngModel)]="searchSource" placeholder="e.g. New York">
+        </div>
+
+        <div class="form-group mb-0">
+          <label><i class="bi bi-pin-map-fill text-emerald"></i> Destination (To)</label>
+          <input type="text" class="form-control" [(ngModel)]="searchDestination" placeholder="e.g. Boston">
+        </div>
+
+        <div class="form-group mb-0">
+          <label><i class="bi bi-calendar3"></i> Travel Date</label>
+          <input type="date" class="form-control" [(ngModel)]="searchDate">
+        </div>
+
+        <div class="form-group mb-0 action-group">
+          <label>&nbsp;</label>
+          <button type="button" class="btn-modern btn-primary w-100" (click)="searchRoutes()">
+            <i class="bi bi-arrow-repeat"></i> Find Coaches
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Area: Bus List & Seat Selector -->
+    <div class="booking-layout-grid" [class.with-seat-selector]="selectedBus() !== null">
+      <!-- Bus Listings -->
+      <div class="bus-list-column">
+        <div class="column-header">
+          <h3>Available Coaches ({{ availableBuses().length }})</h3>
+          <span class="text-muted">Live seat inventory from Valkey cache</span>
+        </div>
+
+        @if (isLoadingBuses()) {
+          <div class="loading-state glass-card">
+            <i class="bi bi-arrow-clockwise spin-icon"></i>
+            <span>Querying fleet availability...</span>
+          </div>
+        } @else if (availableBuses().length === 0) {
+          <div class="empty-state glass-card">
+            <i class="bi bi-bus-front"></i>
+            <h4>No buses found for this route</h4>
+            <p>Try searching between major hubs like New York, Boston, or Washington DC.</p>
+          </div>
+        } @else {
+          <div class="buses-stack">
+            @for (bus of availableBuses(); track bus.busNumber) {
+              <div 
+                class="bus-card glass-card" 
+                [class.bus-card-selected]="selectedBus()?.busNumber === bus.busNumber"
+                (click)="selectBus(bus)">
+                
+                <div class="bus-main-info">
+                  <div class="bus-badge-row">
+                    <span class="badge-pill badge-user">Bus #{{ bus.busNumber }}</span>
+                    <span class="bus-type">Executive Express • 2x2 AC Sleeper</span>
+                  </div>
+
+                  <div class="route-timeline">
+                    <div class="timeline-point">
+                      <span class="time">{{ bus.departureTime || '08:30 AM' }}</span>
+                      <span class="location">{{ bus.source }}</span>
+                    </div>
+                    <div class="timeline-path">
+                      <div class="path-line"></div>
+                      <i class="bi bi-bus-front"></i>
+                      <span class="duration">4h 15m</span>
+                    </div>
+                    <div class="timeline-point">
+                      <span class="time">{{ bus.arrivalTime || '12:45 PM' }}</span>
+                      <span class="location">{{ bus.destination }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="bus-pricing-action">
+                  <div class="price-box">
+                    <span class="currency">$</span>
+                    <span class="amount">{{ bus.price || '45' }}</span>
+                    <span class="per-seat">/ seat</span>
+                  </div>
+
+                  <button type="button" class="btn-modern btn-primary btn-sm">
+                    {{ selectedBus()?.busNumber === bus.busNumber ? 'Selecting Seats' : 'Select Seats' }}
+                    <i class="bi bi-chevron-right"></i>
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- INTERACTIVE 2x2 VISUAL BUS SEAT SELECTOR -->
+      @if (selectedBus(); as activeBus) {
+        <div class="seat-selector-column glass-card">
+          <div class="selector-header">
+            <div>
+              <h3>Choose Seats — Coach #{{ activeBus.busNumber }}</h3>
+              <p class="text-muted">{{ activeBus.source }} <i class="bi bi-arrow-right"></i> {{ activeBus.destination }}</p>
+            </div>
+            <button class="btn-close-modal" (click)="selectedBus.set(null)"><i class="bi bi-x-lg"></i></button>
+          </div>
+
+          <!-- Seat Legend -->
+          <div class="seat-legend">
+            <div class="legend-item"><span class="seat-sample available"></span> Available</div>
+            <div class="legend-item"><span class="seat-sample selected"></span> Selected</div>
+            <div class="legend-item"><span class="seat-sample occupied"></span> Occupied</div>
+          </div>
+
+          <!-- Graphical Bus Cabin -->
+          <div class="bus-cabin-wrapper">
+            <div class="driver-cabin">
+              <span class="driver-icon"><i class="bi bi-steering-wheel"></i> Driver</span>
+              <span class="door-icon"><i class="bi bi-door-open"></i> Entry</span>
+            </div>
+
+            <div class="seats-matrix">
+              @for (seat of seatGrid(); track seat.seatNumber) {
+                <div 
+                  class="seat-box" 
+                  [class.available]="seat.status === 'AVAILABLE'"
+                  [class.occupied]="seat.status === 'OCCUPIED'"
+                  [class.selected]="selectedSeatLabels().includes(seat.seatLabel)"
+                  (click)="toggleSeat(seat)"
+                  [title]="'Seat ' + seat.seatLabel + ' (' + seat.type + ') - $' + seat.price">
+                  
+                  <span class="seat-icon"><i class="bi bi-person-fill"></i></span>
+                  <span class="seat-text">{{ seat.seatLabel }}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Checkout & Pricing Summary -->
+          <div class="checkout-summary">
+            <div class="summary-row">
+              <span>Selected Seats:</span>
+              <span class="selected-seats-pills">
+                @if (selectedSeatLabels().length === 0) {
+                  <em class="text-muted">None clicked yet</em>
+                } @else {
+                  @for (s of selectedSeatLabels(); track s) {
+                    <span class="badge-pill badge-confirmed">{{ s }}</span>
+                  }
+                }
+              </span>
+            </div>
+
+            <div class="summary-row total-row">
+              <span>Total Fare:</span>
+              <span class="total-price">${{ selectedSeatLabels().length * 45 }}</span>
+            </div>
+
+            <button 
+              type="button" 
+              class="btn-modern btn-emerald w-100" 
+              [disabled]="selectedSeatLabels().length === 0 || isBookingInProgress()"
+              (click)="confirmBooking()">
+              @if (isBookingInProgress()) {
+                <i class="bi bi-arrow-clockwise spin-icon"></i> Processing Saga Event...
+              } @else {
+                <i class="bi bi-check2-circle"></i> Confirm & Book {{ selectedSeatLabels().length }} Seat(s)
+              }
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- TAB 2: MY BOOKINGS -->
+  @if (activeTab() === 'MY_BOOKINGS') {
+    <div class="my-bookings-container">
+      @if (isLoadingBookings()) {
+        <div class="loading-state glass-card">
+          <i class="bi bi-arrow-clockwise spin-icon"></i>
+          <span>Retrieving your reservations...</span>
+        </div>
+      } @else if (myBookings().length === 0) {
+        <div class="empty-state glass-card">
+          <i class="bi bi-ticket"></i>
+          <h4>No Bookings Found</h4>
+          <p>You have not booked any coach tickets yet.</p>
+          <button class="btn-modern btn-primary mt-3" (click)="setTab('SEARCH')">Book Your First Trip</button>
+        </div>
+      } @else {
+        <div class="bookings-grid">
+          @for (booking of myBookings(); track (booking.bookingNumber || booking.bookingId || booking.busNumber)) {
+            <div class="booking-ticket-card glass-card">
+              <div class="ticket-top">
+                <div class="booking-ref">
+                  <span class="label">BOOKING ID</span>
+                  <span class="id-val">#{{ booking.bookingNumber || booking.bookingId }}</span>
+                </div>
+                <span class="badge-pill" [class.badge-confirmed]="booking.status === 'CONFIRMED'" [class.badge-cancelled]="booking.status === 'CANCELLED'">
+                  {{ booking.status }}
+                </span>
+              </div>
+
+              <div class="ticket-route">
+                <div class="route-city">
+                  <span class="city-name">{{ booking.source }}</span>
+                  <span class="city-sub">Origin</span>
+                </div>
+                <div class="route-arrow">
+                  <i class="bi bi-arrow-right"></i>
+                  <span class="coach-num">Coach #{{ booking.busNumber }}</span>
+                </div>
+                <div class="route-city text-right">
+                  <span class="city-name">{{ booking.destination }}</span>
+                  <span class="city-sub">Destination</span>
+                </div>
+              </div>
+
+              <div class="ticket-details-row">
+                <div class="detail-item">
+                  <span class="detail-label">Passenger</span>
+                  <span class="detail-val">{{ booking.bookingUser }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Reserved Seats</span>
+                  <span class="detail-val">{{ booking.numberOfSeats }} Seat(s)</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Status</span>
+                  <span class="detail-val text-emerald">{{ booking.status }}</span>
+                </div>
+              </div>
+
+              <div class="ticket-actions">
+                <button type="button" class="btn-modern btn-secondary btn-sm" (click)="viewBoardingPass(booking)">
+                  <i class="bi bi-qr-code"></i> E-Ticket
+                </button>
+                @if (booking.status !== 'CANCELLED') {
+                  <button type="button" class="btn-modern btn-danger btn-sm" (click)="cancelTicket(booking)">
+                    <i class="bi bi-x-circle"></i> Cancel
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- MODAL: BOOKING CONFIRMATION -->
+  @if (activeModal() === 'CONFIRMATION'; as modalOpen) {
+    <div class="modal-backdrop-custom">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3><i class="bi bi-check-circle-fill text-emerald"></i> Reservation Confirmed!</h3>
+          <button class="btn-close-modal" (click)="closeModal()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body text-center">
+          <div class="success-check-icon">
+            <i class="bi bi-patch-check-fill"></i>
+          </div>
+          <h4>Your tickets have been reserved</h4>
+          <p class="text-secondary mt-2">
+            Booking ID: <strong>#{{ latestConfirmedBooking()?.bookingNumber || latestConfirmedBooking()?.bookingId }}</strong> for Coach #{{ latestConfirmedBooking()?.busNumber }}
+          </p>
+          <div class="ticket-mini-preview glass-card mt-3">
+            <div class="d-flex justify-content-between">
+              <span>Route:</span>
+              <strong>{{ latestConfirmedBooking()?.source }} <i class="bi bi-arrow-right"></i> {{ latestConfirmedBooking()?.destination }}</strong>
+            </div>
+            <div class="d-flex justify-content-between mt-2">
+              <span>Seats:</span>
+              <strong class="text-indigo">{{ selectedSeatLabels().join(', ') }}</strong>
+            </div>
+            <div class="d-flex justify-content-between mt-2">
+              <span>Status:</span>
+              <span class="badge-pill badge-confirmed">CONFIRMED</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-modern btn-secondary" (click)="closeModal()">Done</button>
+          <button type="button" class="btn-modern btn-primary" (click)="activeBoardingPass.set(latestConfirmedBooking()); activeModal.set('BOARDING_PASS')">
+            <i class="bi bi-qr-code"></i> View Boarding Pass
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: DIGITAL BOARDING PASS / QR CODE -->
+  @if (activeModal() === 'BOARDING_PASS') {
+    <div class="modal-backdrop-custom">
+      <div class="modal-box boarding-pass-modal">
+        <div class="modal-header">
+          <h3><i class="bi bi-ticket-perforated"></i> Digital Boarding Pass</h3>
+          <button class="btn-close-modal" (click)="closeModal()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="boarding-pass-card">
+            <div class="pass-header">
+              <div class="pass-brand"><i class="bi bi-bus-front-fill"></i> OmniBus Express</div>
+              <div class="pass-class">VIP EXECUTIVE</div>
+            </div>
+
+            <div class="pass-route">
+              <div>
+                <h2>{{ activeBoardingPass()?.source }}</h2>
+                <span>DEPARTURE 08:30 AM</span>
+              </div>
+              <div class="pass-bus-icon">
+                <i class="bi bi-arrow-right"></i>
+              </div>
+              <div class="text-right">
+                <h2>{{ activeBoardingPass()?.destination }}</h2>
+                <span>ARRIVAL 12:45 PM</span>
+              </div>
+            </div>
+
+            <div class="pass-divider"></div>
+
+            <div class="pass-info-grid">
+              <div>
+                <span class="lbl">PASSENGER</span>
+                <span class="val">{{ activeBoardingPass()?.bookingUser }}</span>
+              </div>
+              <div>
+                <span class="lbl">COACH NO.</span>
+                <span class="val">#{{ activeBoardingPass()?.busNumber }}</span>
+              </div>
+              <div>
+                <span class="lbl">SEATS</span>
+                <span class="val text-indigo">{{ activeBoardingPass()?.numberOfSeats }} Seat(s)</span>
+              </div>
+              <div>
+                <span class="lbl">GATE</span>
+                <span class="val">Bay 4A</span>
+              </div>
+            </div>
+
+            <!-- Simulated QR Code -->
+            <div class="qr-code-section">
+              <div class="simulated-qr">
+                <i class="bi bi-qr-code-scan"></i>
+              </div>
+              <span class="qr-label">Scan at boarding gate • Validated via Keycloak</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-modern btn-primary w-100" (click)="closeModal()">Close Pass</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

@@ -1,0 +1,46 @@
+{{- if .Values.rabbitmq.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  labels:
+    {{- include "bus-reservation.labels" . | nindent 4 }}
+    app: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: "{{ .Values.rabbitmq.image.repository }}:{{ .Values.rabbitmq.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.rabbitmq.service.port }}
+              name: amqp
+            - containerPort: {{ .Values.rabbitmq.service.managementPort }}
+              name: management
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  labels:
+    {{- include "bus-reservation.labels" . | nindent 4 }}
+    app: rabbitmq
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.rabbitmq.service.port }}
+      targetPort: amqp
+      name: amqp
+    - port: {{ .Values.rabbitmq.service.managementPort }}
+      targetPort: management
+      name: management
+  selector:
+    app: rabbitmq
+{{- end }}

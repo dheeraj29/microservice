@@ -1,45 +1,62 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { UserService } from '../../services/loginhandler.service';
 
 @Component({
-    selector: 'app-selectpage',
-    templateUrl: './selectpage.component.html',
-    styleUrl: './selectpage.component.scss',
-    standalone: false
+  selector: 'app-selectpage',
+  templateUrl: './selectpage.component.html',
+  styleUrl: './selectpage.component.scss',
+  standalone: false
 })
 export class SelectpageComponent implements OnInit {
-  private activateroute = inject(ActivatedRoute);
-  private httpClient = inject(HttpClient);
+  userService = inject(UserService);
+  private route = inject(ActivatedRoute);
   private router = inject(Router);
 
+  isAuthenticating = signal<boolean>(false);
+  authErrorMessage = signal<string | null>(null);
+
   ngOnInit() {
-    if (this.activateroute.snapshot.queryParamMap.has('code')) {
-      let params = new URLSearchParams();
-      var code = this.activateroute.snapshot.queryParamMap.get('code') || "";
-      var url_path = this.activateroute.snapshot.queryParamMap.get('state') || "";
-      params.append('code', code);
-      const verifier = (cookiename: string) => {
-        return document.cookie.match('(^|;)\\s*' + cookiename + '\\s*=\\s*([^;]+)')?.pop() || '';
-      };
-      params.append('verifier', verifier("challenge"));
-      let headers = new HttpHeaders({
-        'Content-type': 'application/x-www-form-urlencoded'
-      });
-      this.httpClient.post<any>("/generateToken/v1/accessToken", params, { headers }).subscribe({
-        next: data => {
-          this.saveToken(data, url_path);
-        },
-        error: error => {
-          console.log(error);
+    this.route.queryParamMap.subscribe(params => {
+      const code = params.get('code');
+      const error = params.get('error') || params.get('auth_error');
+
+      if (error) {
+        this.authErrorMessage.set(`Authentication failed: ${error}`);
+      } else if (code) {
+        this.router.navigate(['/callback'], { queryParams: { code } });
+      } else {
+        // If already logged in, redirect directly to role home
+        if (this.userService.isAuthenticated()) {
+          this.navigateToRoleHome();
+        } else {
+          this.userService.restoreSession().subscribe(isAuth => {
+            if (isAuth) {
+              this.navigateToRoleHome();
+            }
+          });
         }
-      });
+      }
+    });
+  }
+
+  private navigateToRoleHome() {
+    if (this.userService.isAdmin()) {
+      this.router.navigate(['/admin']);
+    } else {
+      this.router.navigate(['/booking']);
     }
   }
-  saveToken(token: any, url_path: string): void {
-    localStorage.setItem("__access__", token.access_token);
-    document.cookie = "challenge=; Path=/callback; samesite=Strict; max-age=0";
-    document.cookie = "refresh=" + token.refresh_token + "; samesite=strict; secure";
-    this.router.navigateByUrl(url_path);
+
+  login() {
+    this.userService.loginWithKeycloak();
+  }
+
+  navigateTo(path: string) {
+    if (!this.userService.isAuthenticated()) {
+      this.userService.loginWithKeycloak();
+    } else {
+      this.router.navigate([path]);
+    }
   }
 }

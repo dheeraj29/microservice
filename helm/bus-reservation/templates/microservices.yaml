@@ -1,0 +1,49 @@
+{{- range $name, $config := .Values.microservices }}
+{{- if $config.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}service
+  labels:
+    app: {{ $name }}service
+spec:
+  replicas: {{ default 1 $config.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $name }}service
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}service
+    spec:
+      containers:
+        - name: {{ $name }}service
+          image: "{{ $config.image.repository }}:{{ $config.image.tag }}"
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "k8s"
+            - name: SPRING_DATA_REDIS_HOST
+              value: "valkey"
+            - name: SPRING_RABBITMQ_HOST
+              value: "rabbitmq"
+          ports:
+            - containerPort: {{ $config.port }}
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}service
+  labels:
+    app: {{ $name }}service
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ $config.port }}
+      targetPort: http
+      name: http
+  selector:
+    app: {{ $name }}service
+{{- end }}
+{{- end }}

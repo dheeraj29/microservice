@@ -1,0 +1,174 @@
+version: '3.8'
+
+services:
+  # 1. Valkey In-Memory Cache (Linux Foundation Open-Source Redis Drop-In)
+  valkey:
+    image: valkey/valkey:8.0-alpine
+    container_name: bus-valkey
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: valkey-server --save 60 1 --loglevel notice
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 2. PostgreSQL Database for Keycloak
+  postgres:
+    image: postgres:16-alpine
+    container_name: bus-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 3. Keycloak 26+ IAM Server
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: bus-keycloak
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: password
+      KC_HTTP_RELATIVE_PATH: /
+      KC_HEALTH_ENABLED: "true"
+    command: ["start-dev", "--import-realm"]
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro,z
+    ports:
+      - "8088:8080"
+
+  # 4. RabbitMQ Event Broker for Sagas
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: bus-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 5. Service Registry (Eureka)
+  service-registry:
+    build:
+      context: ./service-registry
+      dockerfile: Dockerfile
+    container_name: bus-eureka
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+
+  # 6. Inventory Service
+  inventoryservice:
+    build:
+      context: ./inventoryservice
+      dockerfile: Dockerfile
+    container_name: bus-inventory
+    restart: unless-stopped
+    depends_on:
+      - valkey
+      - rabbitmq
+      - service-registry
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATA_REDIS_HOST=valkey
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+    ports:
+      - "8084:8084"
+
+  # 7. Admin Service
+  adminservice:
+    build:
+      context: ./adminservice
+      dockerfile: Dockerfile
+    container_name: bus-admin
+    restart: unless-stopped
+    depends_on:
+      - valkey
+      - service-registry
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATA_REDIS_HOST=valkey
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+    ports:
+      - "8081:8081"
+
+  # 8. Booking Service
+  bookingservice:
+    build:
+      context: ./bookingservice
+      dockerfile: Dockerfile
+    container_name: bus-booking
+    restart: unless-stopped
+    depends_on:
+      - valkey
+      - rabbitmq
+      - service-registry
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATA_REDIS_HOST=valkey
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+    ports:
+      - "8083:8083"
+
+  # 9. Payment Service
+  paymentservice:
+    build:
+      context: ./paymentservice
+      dockerfile: Dockerfile
+    container_name: bus-payment
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+      - service-registry
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+    ports:
+      - "8085:8085"
+
+  # 10. Envoy Proxy (Edge Pass-Through Gateway)
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    container_name: bus-envoy
+    restart: unless-stopped
+    depends_on:
+      - keycloak
+      - adminservice
+      - bookingservice
+      - inventoryservice
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro,z
+
+volumes:
+  pgdata:

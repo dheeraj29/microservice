@@ -1,5 +1,127 @@
-<nav>
-    <button type="button" class="btn btn-warning" routerLink="/admin" routerLinkActive="true">Admin Console</button>
-    <button type="button" class="btn btn-primary" routerLink="/booking" routerLinkActive="true">Booking Ticket</button>
-</nav>
-<router-outlet></router-outlet>
+<div class="portal-container">
+  <!-- Callback Processing State -->
+  @if (isAuthenticating()) {
+    <div class="glass-card text-center p-5">
+      <i class="bi bi-arrow-clockwise spin-icon" style="font-size: 3rem; color: var(--primary);"></i>
+      <h3 class="mt-3">Authenticating with Keycloak 26+ IAM...</h3>
+      <p class="text-muted">Exchanging OIDC authorization code and establishing secure session...</p>
+    </div>
+  } @else {
+    <!-- Error Banner -->
+    @if (authErrorMessage()) {
+      <div class="toast-alert toast-error mb-4">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span>{{ authErrorMessage() }}</span>
+      </div>
+    }
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="hero-badge">
+        <span class="pulse-dot"></span> Next-Gen Cloud-Native Transport Platform
+      </div>
+      <h1 class="hero-title">
+        Seamless Bus Travel & <br>
+        <span class="gradient-text">Intelligent Fleet Management</span>
+      </h1>
+      <p class="hero-subtitle">
+        Protected by Keycloak 26+ IAM, Envoy Gateway pure pass-through routing, Valkey distributed caching, and Spring Boot 4.x microservices.
+      </p>
+
+      @if (!userService.isAuthenticated()) {
+        <div class="mt-3">
+          <button type="button" class="btn-modern btn-primary" style="font-size: 1.1rem; padding: 0.9rem 2rem;" (click)="login()">
+            <i class="bi bi-shield-lock-fill"></i> Sign In with Keycloak to Access Portal
+          </button>
+        </div>
+      }
+
+      <!-- Quick Stats Metric Row -->
+      <div class="metrics-grid">
+        <div class="metric-card glass-card">
+          <div class="metric-icon icon-indigo"><i class="bi bi-bus-front"></i></div>
+          <div class="metric-data">
+            <span class="metric-value">Live Fleet</span>
+            <span class="metric-label">Microservice Inventory</span>
+          </div>
+        </div>
+
+        <div class="metric-card glass-card">
+          <div class="metric-icon icon-emerald"><i class="bi bi-shield-check"></i></div>
+          <div class="metric-data">
+            <span class="metric-value">Keycloak 26+</span>
+            <span class="metric-label">OIDC Standard IAM</span>
+          </div>
+        </div>
+
+        <div class="metric-card glass-card">
+          <div class="metric-icon icon-amber"><i class="bi bi-lightning-charge"></i></div>
+          <div class="metric-data">
+            <span class="metric-value">Valkey 8+</span>
+            <span class="metric-label">Distributed Session & Cache</span>
+          </div>
+        </div>
+
+        <div class="metric-card glass-card">
+          <div class="metric-icon icon-cyan"><i class="bi bi-arrow-repeat"></i></div>
+          <div class="metric-data">
+            <span class="metric-value">RabbitMQ</span>
+            <span class="metric-label">Distributed Saga Svc</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Feature Portal Cards -->
+    <section class="portal-cards-grid">
+      <!-- Card 1: Ticket Booking -->
+      <div class="portal-card glass-card" (click)="navigateTo('/booking')">
+        <div class="card-tag">Customer Portal</div>
+        <div class="card-icon-wrapper icon-booking">
+          <i class="bi bi-ticket-perforated-fill"></i>
+        </div>
+        <h2 class="card-title">Book Bus Tickets</h2>
+        <p class="card-desc">
+          Search intercity routes, select your preferred window or aisle seats on our 2x2 interactive visual bus map, and get instant digital boarding passes.
+        </p>
+        <div class="card-footer-action">
+          <span class="action-text">{{ userService.isAuthenticated() ? 'Launch Booking Portal' : 'Sign in to Book' }}</span>
+          <i class="bi bi-arrow-right"></i>
+        </div>
+      </div>
+
+      <!-- Card 2: Admin Fleet Management -->
+      @if (userService.isAdmin()) {
+        <div class="portal-card glass-card admin-highlight" (click)="navigateTo('/admin')">
+          <div class="card-tag tag-admin">Operations Console</div>
+          <div class="card-icon-wrapper icon-admin">
+            <i class="bi bi-speedometer2"></i>
+          </div>
+          <h2 class="card-title">Admin Fleet Control</h2>
+          <p class="card-desc">
+            Manage bus inventory, update route pricing, add new coaches, view live booking revenues, and monitor fleet occupancy analytics.
+          </p>
+          <div class="card-footer-action">
+            <span class="action-text">Access Fleet Console</span>
+            <i class="bi bi-arrow-right"></i>
+          </div>
+        </div>
+      } @else {
+        <div class="portal-card glass-card locked-card" (click)="login()">
+          <div class="card-tag tag-locked">Admin Access Required</div>
+          <div class="card-icon-wrapper icon-locked">
+            <i class="bi bi-lock-fill"></i>
+          </div>
+          <h2 class="card-title">Admin Operations</h2>
+          <p class="card-desc">
+            Restricted to administrator accounts. Log in with an administrator account (<code>admin</code>) via Keycloak to manage fleet operations.
+          </p>
+          <div class="card-footer-action">
+            <span class="action-text text-muted">Requires ROLE_ADMIN in Keycloak</span>
+            <i class="bi bi-shield-lock"></i>
+          </div>
+        </div>
+      }
+    </section>
+  }
+</div>

@@ -1,0 +1,120 @@
+global:
+  environment: local-k3s
+  domain: localhost
+
+# Valkey In-Memory Cache Configuration
+valkey:
+  enabled: true
+  image:
+    repository: valkey/valkey
+    tag: 8.0-alpine
+    pullPolicy: IfNotPresent
+  service:
+    port: 6379
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Keycloak IAM Configuration
+keycloak:
+  enabled: true
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: latest
+    pullPolicy: IfNotPresent
+  adminUser: admin
+  adminPassword: adminPassword123
+  realmName: bus-reservation
+  service:
+    port: 8080
+    nodePort: 30080
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+# PostgreSQL for Keycloak
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: 16-alpine
+    pullPolicy: IfNotPresent
+  database: keycloak
+  username: keycloak
+  password: password123
+  service:
+    port: 5432
+
+# RabbitMQ Event Broker
+rabbitmq:
+  enabled: true
+  image:
+    repository: rabbitmq
+    tag: 3-management-alpine
+    pullPolicy: IfNotPresent
+  service:
+    port: 5672
+    managementPort: 15672
+
+# Microservices Common Configuration
+microservices:
+  eureka:
+    enabled: true
+    image:
+      repository: localhost/service-registry
+      tag: latest
+    port: 8761
+  admin:
+    enabled: true
+    replicas: 1
+    image:
+      repository: localhost/adminservice
+      tag: latest
+    port: 8081
+  booking:
+    enabled: true
+    replicas: 1
+    image:
+      repository: localhost/bookingservice
+      tag: latest
+    port: 8083
+  inventory:
+    enabled: true
+    replicas: 1
+    image:
+      repository: localhost/inventoryservice
+      tag: latest
+    port: 8084
+  payment:
+    enabled: true
+    replicas: 1
+    image:
+      repository: localhost/paymentservice
+      tag: latest
+    port: 8085
+
+# Frontend Angular UI
+frontend:
+  enabled: true
+  replicas: 1
+  image:
+    repository: localhost/angularplay
+    tag: latest
+  service:
+    port: 80
+
+# Gateway API & Envoy Ingress
+gateway:
+  enabled: true
+  gatewayClassName: eg # Envoy Gateway default GatewayClass
+  service:
+    port: 80
+    nodePort: 30088

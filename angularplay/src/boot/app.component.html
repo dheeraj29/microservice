@@ -1,13 +1,85 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-</head>
-<header>
-    <b>Bus Reservation</b>
-    <a class="bi bi-box-arrow-right logout" title="logout" (click)="logout()"></a>
-</header>
-<router-outlet></router-outlet>
-<footer>
-    <b>ADR Project</b>
-</footer>
-</html>
+<div class="app-container">
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="nav-brand" (click)="navigateToHome()" style="cursor: pointer;">
+      <div class="brand-icon">
+        <i class="bi bi-bus-front-fill"></i>
+      </div>
+      <div class="brand-text">
+        <span class="brand-title">OmniBus</span>
+        <span class="brand-badge">Enterprise v2.0</span>
+      </div>
+    </div>
+
+    <!-- Navigation Links: Context-Aware Navigation -->
+    <nav class="nav-links">
+      @if (!userService.isAuthenticated()) {
+        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-item">
+          <i class="bi bi-grid-1x2"></i> Overview
+        </a>
+      }
+      @if (userService.isAuthenticated() && !userService.isAdmin()) {
+        <a routerLink="/booking" routerLinkActive="active" class="nav-item">
+          <i class="bi bi-ticket-perforated"></i> Book Tickets
+        </a>
+      }
+      @if (userService.isAdmin()) {
+        <a routerLink="/admin" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-item nav-admin">
+          <i class="bi bi-speedometer2"></i> Fleet Operations
+        </a>
+        <a routerLink="/admin/orders" routerLinkActive="active" class="nav-item nav-admin">
+          <i class="bi bi-receipt-cutoff"></i> Passenger Bookings
+        </a>
+        <a routerLink="/booking" routerLinkActive="active" class="nav-item">
+          <i class="bi bi-ticket-perforated"></i> Customer Portal
+        </a>
+      }
+    </nav>
+
+    <!-- User Profile & Keycloak Authentication Actions -->
+    <div class="nav-actions">
+      @if (userService.isAuthenticated()) {
+        <!-- Active User Profile Card -->
+        <div class="user-profile-badge">
+          <div class="avatar">
+            <i class="bi" [class.bi-shield-check]="userService.isAdmin()" [class.bi-person-circle]="!userService.isAdmin()"></i>
+          </div>
+          <div class="user-info">
+            <span class="user-name">{{ userService.currentUser()?.fullName }}</span>
+            <span class="badge-pill" [class.badge-admin]="userService.isAdmin()" [class.badge-user]="!userService.isAdmin()">
+              {{ userService.isAdmin() ? 'ADMIN' : 'USER' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Logout Action -->
+        <button class="btn-logout" (click)="logout()" title="Sign Out & End Keycloak Session">
+          <i class="bi bi-box-arrow-right"></i>
+        </button>
+      } @else {
+        <!-- Sign In Button -->
+        <button type="button" class="btn-modern btn-primary btn-sm" (click)="login()">
+          <i class="bi bi-key-fill"></i> Keycloak Sign In
+        </button>
+      }
+    </div>
+  </header>
+
+  <!-- Main Viewport Content -->
+  <main class="app-main-content">
+    <router-outlet></router-outlet>
+  </main>
+
+  <!-- Modern Application Footer -->
+  <footer class="app-footer">
+    <div class="footer-left">
+      <span class="status-dot"></span> Cloud-Native System Operational
+    </div>
+    <div class="footer-center">
+      <span>Keycloak 26+ IAM</span> • <span>Valkey 8+ Caching</span> • <span>BFF Gateway Security</span> • <span>Spring Boot 4.x</span>
+    </div>
+    <div class="footer-right">
+      <span>OmniBus Architecture Platform &copy; 2026</span>
+    </div>
+  </footer>
+</div>

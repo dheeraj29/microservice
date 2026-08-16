@@ -19,6 +19,12 @@ public class BookingModel {
 		public void setBookingNumber(int bookingNumber) {
 			this.bookingNumber = bookingNumber;
 		}
+		public int getBookingId() {
+			return bookingNumber;
+		}
+		public void setBookingId(int bookingId) {
+			this.bookingNumber = bookingId;
+		}
 		public int getBusNumber() {
 			return busNumber;
 		}

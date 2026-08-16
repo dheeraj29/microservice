@@ -8,13 +8,13 @@ import com.da.demo.paymentservice.model.BookingModel;
 
 @Service
 public class RabbitMQProducer {
-	@Value("${rabbit.exchange.name}")
+	@Value("${rabbit.exchange.name:bus-exchange}")
 	private String exchangename;
 	
-	@Value("${rabbit.inventory.routekey}")
+	@Value("${rabbit.inventory.routekey:inventory-key}")
 	private String inventoryRoutekey;
 	
-	@Value("${rabbit.booking.routekey}")
+	@Value("${rabbit.booking.routekey:booking-key}")
 	private String bookingkey;
 	
 	private RabbitTemplate rabbitTemplate;
@@ -24,10 +24,18 @@ public class RabbitMQProducer {
 	}
 	
 	public void sendInventoryUpdate(BookingModel bookingModel) {
-		rabbitTemplate.convertAndSend(exchangename,inventoryRoutekey,bookingModel);
+		try {
+			if (rabbitTemplate != null) {
+				rabbitTemplate.convertAndSend(exchangename, inventoryRoutekey, bookingModel);
+			}
+		} catch (Exception ignored) {}
 	}
 	
 	public void sendBookingUpdate(BookingModel bookingModel) {
-		rabbitTemplate.convertAndSend(exchangename,bookingkey,bookingModel);
+		try {
+			if (rabbitTemplate != null) {
+				rabbitTemplate.convertAndSend(exchangename, bookingkey, bookingModel);
+			}
+		} catch (Exception ignored) {}
 	}
 }

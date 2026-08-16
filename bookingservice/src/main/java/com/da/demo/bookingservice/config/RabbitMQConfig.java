@@ -13,22 +13,21 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-
 @Configuration
 public class RabbitMQConfig {
 	
-	@Value("${rabbit.booking.queuename}")
+	@Value("${rabbit.booking.queuename:booking-queue}")
 	private String bookqueuename;
 	
-	@Value("${rabbit.exchange.name}")
+	@Value("${rabbit.exchange.name:bus-exchange}")
 	private String exchangename;
 	
-	@Value("${rabbit.booking.routekey}")
+	@Value("${rabbit.booking.routekey:booking-key}")
 	private String bookroutekey;
 	
 	@Bean
 	Queue bookqueue() {
-		return new Queue(bookqueuename,true,false,false);
+		return new Queue(bookqueuename, true, false, false);
 	}
 	
 	@Bean
@@ -43,7 +42,6 @@ public class RabbitMQConfig {
 				.with(bookroutekey);
 	}
 	
-	//JSON Converter
 	@Bean
 	MessageConverter converter() {
 		return new Jackson2JsonMessageConverter();

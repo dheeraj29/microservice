@@ -1,1 +1,205 @@
-<p>Admin mode!</p>
+<div class="admin-dashboard-container">
+  <!-- Toast Notification -->
+  @if (toastMessage()) {
+    <div class="toast-alert" [class.toast-success]="toastMessage()?.type === 'success'" [class.toast-error]="toastMessage()?.type === 'error'">
+      <i class="bi" [class.bi-check-circle-fill]="toastMessage()?.type === 'success'" [class.bi-exclamation-triangle-fill]="toastMessage()?.type === 'error'"></i>
+      <span>{{ toastMessage()?.text }}</span>
+    </div>
+  }
+
+  <!-- Admin Header & Actions -->
+  <div class="admin-header-bar">
+    <div class="header-titles">
+      <h2>Fleet Operations Dashboard</h2>
+      <p class="subtitle">Real-time bus route management, capacity monitoring, and fleet controls.</p>
+    </div>
+
+    <div class="admin-top-actions">
+      <button type="button" class="btn-modern btn-secondary" routerLink="/admin/orders">
+        <i class="bi bi-receipt"></i> View Customer Orders
+      </button>
+      <button type="button" class="btn-modern btn-primary" (click)="openAddModal()">
+        <i class="bi bi-plus-circle"></i> Add New Coach
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI Metric Cards Grid -->
+  <div class="kpi-cards-grid">
+    <div class="kpi-card glass-card">
+      <div class="kpi-icon icon-indigo"><i class="bi bi-bus-front"></i></div>
+      <div class="kpi-content">
+        <span class="kpi-val">{{ stats().totalBuses }}</span>
+        <span class="kpi-lbl">Active Coaches</span>
+      </div>
+    </div>
+
+    <div class="kpi-card glass-card">
+      <div class="kpi-icon icon-emerald"><i class="bi bi-signpost-split"></i></div>
+      <div class="kpi-content">
+        <span class="kpi-val">{{ stats().activeRoutes }}</span>
+        <span class="kpi-lbl">Intercity Routes</span>
+      </div>
+    </div>
+
+    <div class="kpi-card glass-card">
+      <div class="kpi-icon icon-cyan"><i class="bi bi-people"></i></div>
+      <div class="kpi-content">
+        <span class="kpi-val">{{ stats().totalFleetCapacity }}</span>
+        <span class="kpi-lbl">Total Seat Capacity</span>
+      </div>
+    </div>
+
+    <div class="kpi-card glass-card">
+      <div class="kpi-icon icon-amber"><i class="bi bi-pie-chart"></i></div>
+      <div class="kpi-content">
+        <span class="kpi-val">{{ stats().averageOccupancyRate }}%</span>
+        <span class="kpi-lbl">Avg. Fleet Occupancy</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fleet Table Section -->
+  <div class="fleet-table-card glass-card">
+    <div class="table-top-bar">
+      <div class="search-box">
+        <i class="bi bi-search"></i>
+        <input 
+          type="text" 
+          class="form-control table-search-input" 
+          [(ngModel)]="searchQuery" 
+          placeholder="Filter by Coach #, Origin, or Destination...">
+      </div>
+      <span class="fleet-count-badge">Showing {{ filteredBuses.length }} of {{ buses().length }} Coaches</span>
+    </div>
+
+    @if (isLoading()) {
+      <div class="loading-state">
+        <i class="bi bi-arrow-clockwise spin-icon"></i>
+        <span>Loading fleet inventory...</span>
+      </div>
+    } @else if (filteredBuses.length === 0) {
+      <div class="empty-state">
+        <i class="bi bi-inbox"></i>
+        <h4>No matching coaches found</h4>
+        <p>Try clearing your search query or add a new bus.</p>
+      </div>
+    } @else {
+      <div class="modern-table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Coach #</th>
+              <th>Origin (From)</th>
+              <th>Destination (To)</th>
+              <th>Total Capacity</th>
+              <th>Fare / Seat</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (bus of filteredBuses; track bus.busNumber) {
+              <tr>
+                <td>
+                  <span class="badge-pill badge-user">#{{ bus.busNumber }}</span>
+                </td>
+                <td><strong>{{ bus.source }}</strong></td>
+                <td><strong>{{ bus.destination }}</strong></td>
+                <td>{{ bus.totalSeats || '40' }} Seats</td>
+                <td><strong class="text-emerald">${{ bus.price || '45' }}</strong></td>
+                <td>
+                  <span class="status-indicator active">
+                    <span class="dot"></span> In Service
+                  </span>
+                </td>
+                <td class="text-right">
+                  <div class="action-buttons-group">
+                    <button type="button" class="btn-action edit" (click)="openEditModal(bus)" title="Edit Route & Price">
+                      <i class="bi bi-pencil-square"></i>
+                    </button>
+                    <button type="button" class="btn-action delete" (click)="openDeleteModal(bus)" title="Decommission Coach">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+  <!-- MODAL: ADD / EDIT BUS -->
+  @if (activeModal() === 'ADD' || activeModal() === 'EDIT') {
+    <div class="modal-backdrop-custom">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>
+            <i class="bi" [class.bi-plus-circle]="activeModal() === 'ADD'" [class.bi-pencil-square]="activeModal() === 'EDIT'"></i>
+            {{ activeModal() === 'ADD' ? 'Add New Coach to Fleet' : 'Edit Coach #' + formBus.busNumber }}
+          </h3>
+          <button class="btn-close-modal" (click)="closeModal()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Coach Number</label>
+            <input type="number" class="form-control" [(ngModel)]="formBus.busNumber" [disabled]="activeModal() === 'EDIT'">
+          </div>
+          <div class="form-group">
+            <label>Origin Hub (Source)</label>
+            <input type="text" class="form-control" [(ngModel)]="formBus.source" placeholder="e.g. New York">
+          </div>
+          <div class="form-group">
+            <label>Destination Hub</label>
+            <input type="text" class="form-control" [(ngModel)]="formBus.destination" placeholder="e.g. Boston">
+          </div>
+          <div class="row-two-inputs">
+            <div class="form-group">
+              <label>Seat Capacity</label>
+              <input type="text" class="form-control" [(ngModel)]="formBus.totalSeats">
+            </div>
+            <div class="form-group">
+              <label>Ticket Price ($)</label>
+              <input type="text" class="form-control" [(ngModel)]="formBus.price">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-modern btn-secondary" (click)="closeModal()">Cancel</button>
+          <button type="button" class="btn-modern btn-primary" (click)="saveBus()">
+            <i class="bi bi-check2"></i> {{ activeModal() === 'ADD' ? 'Add Coach' : 'Save Changes' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: DELETE CONFIRMATION -->
+  @if (activeModal() === 'DELETE') {
+    <div class="modal-backdrop-custom">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3 class="text-danger"><i class="bi bi-exclamation-octagon-fill"></i> Confirm Decommission</h3>
+          <button class="btn-close-modal" (click)="closeModal()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body text-center">
+          <div class="delete-warning-icon">
+            <i class="bi bi-trash3-fill text-danger"></i>
+          </div>
+          <h4>Remove Coach #{{ selectedBusForAction()?.busNumber }}?</h4>
+          <p class="text-secondary mt-2">
+            This will remove the route between <strong>{{ selectedBusForAction()?.source }}</strong> and <strong>{{ selectedBusForAction()?.destination }}</strong> from active reservation.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-modern btn-secondary" (click)="closeModal()">Cancel</button>
+          <button type="button" class="btn-modern btn-danger" (click)="confirmDelete()">
+            <i class="bi bi-trash3"></i> Delete Coach
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>
