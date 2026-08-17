@@ -1,0 +1,41 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: RateLimitPolicy
+metadata:
+  name: omnibus-rate-limit-policy
+  namespace: default
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: omnibus-http-routes
+  global:
+    rules:
+      # 1. Protection on CAPTCHA Generation (Anti-Scraping / Anti-Flooding)
+      - clientSelectors:
+          - headers:
+              - name: ":path"
+                value: "^/auth/captcha.*"
+                type: RegularExpression
+        limit:
+          requests: 15
+          unit: Minute
+        cost: 1
+
+      # 2. Protection on Direct Login (Anti-Brute Force / Anti-Credential Stuffing)
+      - clientSelectors:
+          - headers:
+              - name: ":path"
+                value: "^/auth/login.*"
+                type: RegularExpression
+        limit:
+          requests: 5
+          unit: Minute
+        cost: 1
+
+      # 3. Default Ingress Baseline per IP for All Microservices
+      - clientSelectors:
+          - sourceIP: {}
+        limit:
+          requests: 120
+          unit: Minute
+        cost: 1

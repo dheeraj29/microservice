@@ -9,13 +9,17 @@ import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { SelectpageComponent } from './selectpage/selectpage.component';
 import { CallbackComponent } from './callback/callback.component';
+import { LoginComponent } from './login/login.component';
+import { LogoutComponent } from './logout/logout.component';
 import { loginInterceptor } from '../interceptor/login.interceptor';
 
 @NgModule({
   declarations: [
     AppComponent,
     SelectpageComponent,
-    CallbackComponent
+    CallbackComponent,
+    LoginComponent,
+    LogoutComponent
   ],
   imports: [
     BrowserModule,

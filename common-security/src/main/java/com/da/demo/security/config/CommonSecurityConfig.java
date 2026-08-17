@@ -33,6 +33,7 @@ public class CommonSecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                "/auth/**",
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/actuator/info",

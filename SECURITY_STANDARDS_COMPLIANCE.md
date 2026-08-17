@@ -14,6 +14,7 @@
 4. [IETF RFC & Industry Standards Compliance](#4-ietf-rfc--industry-standards-compliance)
 5. [NIST Digital Identity & Zero-Trust Alignment](#5-nist-digital-identity--zero-trust-alignment)
 6. [Defense-in-Depth Technical Reference Matrix](#6-defense-in-depth-technical-reference-matrix)
+7. [DDoS & Cache Memory Exhaustion (CWE-400) Mitigations](#7-ddos--cache-memory-exhaustion-cwe-400-mitigations)
 
 ---
 
@@ -61,9 +62,9 @@ The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Archi
 
 | Threat Scenario | OmniBus Platform Mitigation | Code & Configuration Reference |
 | :--- | :--- | :--- |
-| **Authorization Code Interception** | Mandatory **PKCE (Proof Key for Code Exchange - RFC 7636)** using `java.security.SecureRandom` (32 bytes entropy) and SHA-256 hash (`code_challenge_method=S256`). | [`PkceUtil.java`](file:///c:/Personal-Project/microservice-main/microservice-main/gateway/src/main/java/com/da/demo/gateway/security/PkceUtil.java), [`BffAuthController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/gateway/src/main/java/com/da/demo/gateway/controller/BffAuthController.java) |
+| **Authorization Code Interception** | Mandatory **PKCE (Proof Key for Code Exchange - RFC 7636)** using `java.security.SecureRandom` (32 bytes entropy) and SHA-256 hash (`code_challenge_method=S256`). | [`PkceUtil.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/service/PkceUtil.java), [`BffAuthController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/controller/BffAuthController.java) |
 | **Hardcoded Secrets & Plaintext Keys** | All Keycloak client secrets and database passwords use externalized environment variables with safe dev fallbacks (`${KEYCLOAK_INTERNAL_SECRET:...}`). | [`application.properties`](file:///c:/Personal-Project/microservice-main/microservice-main/adminservice/src/main/resources/application.properties), [`compose.yaml`](file:///c:/Personal-Project/microservice-main/microservice-main/compose.yaml) |
-| **Cookie Man-in-the-Middle** | Session cookies utilize `__Host-` prefix with `Secure`, `HttpOnly`, `SameSite=Lax`, and `Path=/`. Dynamic HTTPS detection via `X-Forwarded-Proto` header. | [`BffAuthController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/gateway/src/main/java/com/da/demo/gateway/controller/BffAuthController.java#L140-L160) |
+| **Cookie Man-in-the-Middle** | Session cookies utilize `__Host-` prefix with `Secure`, `HttpOnly`, `SameSite=Lax`, and `Path=/`. Dynamic HTTPS detection via `X-Forwarded-Proto` header. | [`BffAuthController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/controller/BffAuthController.java) |
 | **Forged / Tampered JWTs** | Microservices validate RSA-256 signatures against Keycloak's public JWKS endpoint (`/protocol/openid-connect/certs`). | [`common-security/pom.xml`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/pom.xml) (`spring-boot-starter-oauth2-resource-server`) |
 
 ---
@@ -72,8 +73,8 @@ The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Archi
 
 | Threat Scenario | OmniBus Platform Mitigation | Code & Configuration Reference |
 | :--- | :--- | :--- |
-| **SQL Injection (SQLi)** | 100% of database interactions use Spring Data JPA / Hibernate parameterized queries and ORM repository interfaces. Zero raw SQL string concatenation. | [`BusRepository.java`](file:///c:/Personal-Project/microservice-main/microservice-main/adminservice/src/main/java/com/da/demo/adminservice/repository/BusRepository.java), [`BookingRepository.java`](file:///c:/Personal-Project/microservice-main/microservice-main/bookingservice/src/main/java/com/da/demo/bookingservice/repository/BookingRepository.java) |
-| **Open Redirect Injection** | Login return targets are strictly sanitized (`sanitizeRedirectUrl`) ensuring destination paths are relative (`/`) and rejecting protocol-relative phishing URLs (`//evil.com`) or backslashes (`\`). | [`BffAuthController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/gateway/src/main/java/com/da/demo/gateway/controller/BffAuthController.java) |
+| **SQL Injection (SQLi)** | 100% of database interactions use Spring Data JPA / Hibernate parameterized queries and ORM repository interfaces. Zero raw SQL string concatenation. | [`BusDetailRepository.java`](file:///c:/Personal-Project/microservice-main/microservice-main/adminservice/src/main/java/com/da/demo/adminservice/repository/BusDetailRepository.java), [`BookingRepository.java`](file:///c:/Personal-Project/microservice-main/microservice-main/bookingservice/src/main/java/com/da/demo/bookingservice/repository/BookingRepository.java) |
+| **Open Redirect Injection** | Login return targets are strictly sanitized (`sanitizeRedirectUrl`) ensuring destination paths are relative (`/`) and rejecting protocol-relative phishing URLs (`//evil.com`) or backslashes (`\`). | [`BffAuthController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/controller/BffAuthController.java) |
 
 ---
 
@@ -81,8 +82,8 @@ The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Archi
 
 | Threat Scenario | OmniBus Platform Mitigation | Code & Configuration Reference |
 | :--- | :--- | :--- |
-| **Client-Side Token Storage Anti-Pattern** | Implemented the **Backend-For-Frontend (BFF)** pattern. JWT tokens are stored exclusively in Valkey memory. The browser receives only an unguessable opaque session ID. | [`DistributedSessionManager.java`](file:///c:/Personal-Project/microservice-main/microservice-main/gateway/src/main/java/com/da/demo/gateway/session/DistributedSessionManager.java), [`DEVELOPER_GUIDE.md`](file:///c:/Personal-Project/microservice-main/microservice-main/DEVELOPER_GUIDE.md#3-decentralized-embedded-bff-pattern--valkey-caching) |
-| **Token Refresh Race Conditions (Stampede)** | Distributed mutex locking in Valkey (`SET lock:refresh:<sid> NX PX 5000`) paired with 10-second graceful pointer redirection (`pointer:<oldSid> = <newSid>`) ensures concurrency-safe single-thread token renewal. | [`DistributedSessionManager.java`](file:///c:/Personal-Project/microservice-main/microservice-main/gateway/src/main/java/com/da/demo/gateway/session/DistributedSessionManager.java#L80-L130) |
+| **Client-Side Token Storage Anti-Pattern** | Implemented the **Decentralized Embedded BFF** pattern. JWT tokens are stored exclusively in Valkey memory. The browser receives only an unguessable opaque session ID. | [`DistributedSessionManager.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/session/DistributedSessionManager.java), [`DEVELOPER_GUIDE.md`](file:///c:/Personal-Project/microservice-main/microservice-main/DEVELOPER_GUIDE.md#3-decentralized-embedded-bff-pattern--valkey-caching) |
+| **Token Refresh Race Conditions (Stampede)** | Distributed mutex locking in Valkey (`SET mutex:refresh:<sid> NX PX 5000`) paired with 10-second graceful pointer redirection (`pointer:<oldSid> = <newSid>`) ensures concurrency-safe single-thread token renewal. | [`DistributedSessionManager.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/session/DistributedSessionManager.java) |
 | **Cascading Microservice Outages** | Circuit Breakers (`@CircuitBreaker`) and automatic Retries (`@Retry`) via Resilience4j with graceful fallback methods. | [`BookingController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/bookingservice/src/main/java/com/da/demo/bookingservice/controller/BookingController.java) |
 
 ---
@@ -101,7 +102,7 @@ The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Archi
 
 | Threat Scenario | OmniBus Platform Mitigation | Code & Configuration Reference |
 | :--- | :--- | :--- |
-| **Unpatched Dependencies / CVEs** | Upgraded platform to latest production baseline: **Spring Boot `3.5.16`**, **Spring Cloud `2025.0.3`**, **SpringDoc OpenAPI `2.9.0`**, **Nimbus JOSE JWT `9.47`**, and **ModelMapper `3.2.1`**. | [`pom.xml`](file:///c:/Personal-Project/microservice-main/microservice-main/pom.xml) |
+| **Unpatched Dependencies / CVEs** | Upgraded platform to latest production baseline: **Spring Boot `3.5.16`**, **Spring Cloud `2025.0.3`**, **SpringDoc OpenAPI `2.9.0`**, **Nimbus JOSE JWT `10.9.1`**, and **ModelMapper `3.2.6`**. | [`pom.xml`](file:///c:/Personal-Project/microservice-main/microservice-main/pom.xml) |
 | **Version Drift Across Services** | Centralized root multi-module parent POM (`omnibus-parent:1.0.0`) manages all dependency versions centrally via `<dependencyManagement>`. | [`pom.xml`](file:///c:/Personal-Project/microservice-main/microservice-main/pom.xml) |
 
 ---
@@ -110,10 +111,10 @@ The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Archi
 
 | Threat Scenario | OmniBus Platform Mitigation | Code & Configuration Reference |
 | :--- | :--- | :--- |
-| **Session Fixation / Replay Attacks** | **Refresh Token Rotation (RTR)**: Keycloak invalidates refresh tokens upon single use (`Revoke Refresh Token: true`). In addition, Valkey archives rotated session IDs (`revoked_archive:<sessionId>`) to detect hijacked reuse attempts. | [`keycloak/realm-export.json`](file:///c:/Personal-Project/microservice-main/microservice-main/keycloak/realm-export.json), [`DistributedSessionManager.java`](file:///c:/Personal-Project/microservice-main/microservice-main/gateway/src/main/java/com/da/demo/gateway/session/DistributedSessionManager.java) |
-| **Session Hijacking via Stolen Cookie** | Client Fingerprinting binds the client's network address/host to the Valkey session record during creation. | [`DistributedSessionManager.java`](file:///c:/Personal-Project/microservice-main/microservice-main/gateway/src/main/java/com/da/demo/gateway/session/DistributedSessionManager.java#L41-L57) |
+| **Session Fixation / Replay Attacks** | **Refresh Token Rotation (RTR)**: Keycloak invalidates refresh tokens upon single use (`Revoke Refresh Token: true`). In addition, Valkey archives rotated session IDs (`revoked_archive:<sessionId>`) to detect hijacked reuse attempts. | [`keycloak/realm-export.json`](file:///c:/Personal-Project/microservice-main/microservice-main/keycloak/realm-export.json), [`DistributedSessionManager.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/session/DistributedSessionManager.java) |
+| **Session Hijacking via Stolen Cookie** | Client Fingerprinting binds the client's network address/host to the Valkey session record during creation. | [`DistributedSessionManager.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/session/DistributedSessionManager.java) |
 | **Long-Lived Leaked Access Tokens** | Access tokens are tuned to **5 minutes (300s)**. SSO Session idle timeout is tuned to **30 minutes**, perfectly aligned with Valkey's sliding window cache TTL. | [`DEVELOPER_GUIDE.md`](file:///c:/Personal-Project/microservice-main/microservice-main/DEVELOPER_GUIDE.md#4-keycloak-architecture-configuration--best-practices) |
-| **CSRF in Login Flow** | Ephemeral `state` UUID tokens stored in Valkey (`pkce:state:<state>`) validate that the login callback originates from the exact client instance that started it. | [`BffAuthController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/gateway/src/main/java/com/da/demo/gateway/controller/BffAuthController.java) |
+| **CSRF in Login Flow** | Ephemeral `state` UUID tokens stored in Valkey (`pkce:state:<state>`) validate that the login callback originates from the exact client instance that started it. | [`BffAuthController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/controller/BffAuthController.java) |
 
 ---
 
@@ -238,9 +239,37 @@ The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Archi
 │ Deep-Link Navigation Loss    │ State-Bound Target URL In Valkey   │ DistributedSessionManager.java (PkceStateRecord)       │
 │ Token Refresh Race Condition │ Valkey Mutex + Grace Pointer (10s) │ DistributedSessionManager.java (resolveSession)        │
 │ Stolen Refresh Token Replay  │ Keycloak RTR + Revoked Archive     │ keycloak/realm-export.json                             │
+│ Brute Force / Auto Cred Stuff│ Server-Side CAPTCHA + Brute Force  │ ValkeyCaptchaAuthenticator.java & Keycloak Realm       │
 │ Microservice Impersonation   │ M2M Client Credentials Grant       │ FeignAuthRequestInterceptor.java                       │
 │ Gateway Memory Exhaustion    │ 4-Tier Valkey TTL Lifecycle        │ DistributedSessionManager.java                         │
 │ Service Cascading Failures   │ Resilience4j Circuit Breakers      │ BookingController.java                                 │
 │ Gateway Edge Penetration     │ Kubernetes HTTPRoute Whitelist     │ envoy/httproute.yaml                                   │
 └──────────────────────────────┴────────────────────────────────────┴────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 7. DDoS & Cache Memory Exhaustion (CWE-400) Mitigations
+
+Under distributed denial-of-service (DDoS) or high-concurrency bot attacks, caching layers (Valkey/Redis) are susceptible to **Cache Exhaustion (CWE-400)** where automated scripts flood generation endpoints to consume host RAM. OmniBus mitigates this using a **4-tier Defense-in-Depth model**:
+
+### 🛡️ Tier 1: Gateway IP & Endpoint Rate Limiting (Token Bucket / Sliding Window)
+* **`/auth/captcha`**: Limited to **15 requests/min per IP** (HTTP 429 Too Many Requests).
+* **`/auth/login`**: Limited to **5 attempts/min per IP** to prevent automated credential stuffing (OWASP OAT-007) and brute force attacks (OWASP OAT-008).
+* **Declarative Specification**: Specified in [`envoy/ratelimit-policy.yaml`](file:///c:/Personal-Project/microservice-main/microservice-main/envoy/ratelimit-policy.yaml) for Kubernetes Gateway API / Envoy.
+
+### 🧮 Tier 2: Keycloak Server-Side CAPTCHA Authenticator SPI (`keycloak-captcha-spi`)
+* **100% Server Enforced**: The custom `ValkeyCaptchaAuthenticator` SPI runs directly inside Keycloak's server-side authentication pipeline. API/curl direct POST attempts cannot bypass verification.
+* **Ephemeral Cryptographic HMAC**: Challenges are signed with 120s time-bounded HMAC-SHA256 signatures, ensuring zero server memory leaks.
+* **OmniBus Custom Theme**: High-DPI vector SVG challenge with 1-click refresh 🔄 and quick-fill demo credentials.
+
+### 🔒 Tier 3: Keycloak Native Brute Force Detection & Account Lockout
+* **Active Protection**: `bruteForceProtected: true` activated on `bus-reservation` realm.
+* **Failure Factor**: Max **5 failed password attempts** before account is temporarily locked.
+* **Progressive Delay & Lockout**: Imposes a 2-second delay after initial failures and locks user accounts for **15 minutes (`maxFailureWaitSeconds: 900`)** upon threshold violation.
+
+### ⚙️ Tier 4: Valkey Engine Guardrails & Eviction Policies
+* **Hard Memory Ceiling**: Valkey is bounded by `--maxmemory 256mb` (or `512mb` in cluster mode), preventing Linux OOM killer invocation.
+* **`volatile-lru` Eviction**: Automatically purges expiring keys under memory pressure, preserving platform availability.
+* **Multi-Tier Strict TTLs**: User sessions (30m), token rotation grace pointers (10s), distributed mutex locks (5s).
+

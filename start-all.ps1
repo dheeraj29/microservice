@@ -59,7 +59,7 @@ if ($hasPodman) {
 # 2. Start Keycloak
 Write-Host "`n[2/6] Starting Keycloak 26+ IAM Server (Port 8088)..." -ForegroundColor Green
 if (Test-Path $KcCmd) {
-    Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d `"$KcBin`" && kc.bat start-dev --http-port=8088" -WindowStyle Minimized
+    Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d `"$KcBin`" && kc.bat start-dev --http-port=8088 --import-realm" -WindowStyle Minimized
     $null = Wait-ForService "Keycloak IAM" "http://localhost:8088/realms/bus-reservation" 40
 } else {
     Write-Host "Keycloak not found in tools directory." -ForegroundColor Red
@@ -71,8 +71,8 @@ $regPath = Join-Path $BaseDir "service-registry"
 Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d `"$regPath`" && `"$MvnCmd`" spring-boot:run" -WindowStyle Minimized
 $null = Wait-ForService "Service Registry (Eureka)" "http://localhost:8761" 35
 
-# 4. Start API Gateway & Auth Orchestrator (Port 8080)
-Write-Host "`n[4/6] Starting API Gateway & Auth Orchestrator (Port 8080)..." -ForegroundColor Green
+# 4. Start API Gateway (Port 8080)
+Write-Host "`n[4/6] Starting API Gateway (Port 8080)..." -ForegroundColor Green
 $gwPath = Join-Path $BaseDir "gateway"
 Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d `"$gwPath`" && `"$MvnCmd`" spring-boot:run" -WindowStyle Minimized
 $null = Wait-ForService "API Gateway" "http://localhost:8080/actuator/health" 35

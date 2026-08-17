@@ -173,6 +173,54 @@ public class DistributedSessionManager {
         return Boolean.TRUE.equals(redisTemplate.hasKey("revoked_archive:" + sessionId));
     }
 
+    public void savePkceState(String state, String codeVerifier, String targetUrl) {
+        if (state == null || state.isBlank()) {
+            return;
+        }
+        try {
+            String key = "pkce:state:" + state;
+            PkceStateRecord record = new PkceStateRecord(codeVerifier, targetUrl);
+            String json = objectMapper.writeValueAsString(record);
+            redisTemplate.opsForValue().set(key, json, Duration.ofMinutes(5));
+        } catch (Exception e) {
+            log.error("Failed to save PKCE state {}: {}", state, e.getMessage());
+        }
+    }
+
+    public PkceStateRecord consumePkceState(String state) {
+        if (state == null || state.isBlank()) {
+            return null;
+        }
+        String key = "pkce:state:" + state;
+        String json = redisTemplate.opsForValue().get(key);
+        if (json != null) {
+            redisTemplate.delete(key);
+            try {
+                return objectMapper.readValue(json, PkceStateRecord.class);
+            } catch (Exception e) {
+                return new PkceStateRecord(json, null);
+            }
+        }
+        return null;
+    }
+
+    public static class PkceStateRecord {
+        private String codeVerifier;
+        private String targetUrl;
+
+        public PkceStateRecord() {}
+
+        public PkceStateRecord(String codeVerifier, String targetUrl) {
+            this.codeVerifier = codeVerifier;
+            this.targetUrl = targetUrl;
+        }
+
+        public String getCodeVerifier() { return codeVerifier; }
+        public void setCodeVerifier(String codeVerifier) { this.codeVerifier = codeVerifier; }
+        public String getTargetUrl() { return targetUrl; }
+        public void setTargetUrl(String targetUrl) { this.targetUrl = targetUrl; }
+    }
+
     private void saveSession(SessionRecord session, String sessionId, Duration ttl) {
         try {
             String json = objectMapper.writeValueAsString(session);

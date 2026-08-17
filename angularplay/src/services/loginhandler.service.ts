@@ -39,9 +39,11 @@ export class UserService {
     this.restoreSession().subscribe();
   }
 
-  // Redirect to BFF Gateway Login -> Keycloak OIDC (prompt=login forced) with target URL state
+  /**
+   * Initiates OIDC Federated SSO Login redirect via Keycloak (prompt=login forced).
+   */
   loginWithKeycloak(redirectPath?: string) {
-    const target = redirectPath || (window.location.pathname !== '/' && window.location.pathname !== '/callback' ? window.location.pathname + window.location.search : '');
+    const target = redirectPath || (window.location.pathname !== '/' && window.location.pathname !== '/callback' && window.location.pathname !== '/login' ? window.location.pathname + window.location.search : '');
     if (target) {
       window.location.href = `${this.bffAuthUrl}/login?redirect=${encodeURIComponent(target)}`;
     } else {
@@ -49,7 +51,9 @@ export class UserService {
     }
   }
 
-  // Restore authenticated session via BFF Gateway HttpOnly Cookie
+  /**
+   * Restores authenticated session via BFF Gateway HttpOnly Cookie.
+   */
   restoreSession(): Observable<boolean> {
     return this.http.get<BffUserResponse>(`${this.bffAuthUrl}/user`, { withCredentials: true }).pipe(
       tap((res) => {
@@ -81,8 +85,10 @@ export class UserService {
     return user.roles.some(r => r.toUpperCase() === normalized || r.toUpperCase() === `ROLE_${normalized}`);
   }
 
+  /**
+   * Terminate session via API and redirect to Keycloak themed logout page.
+   */
   logout() {
-    this.currentUser.set(null);
     window.location.href = `${this.bffAuthUrl}/logout`;
   }
 }

@@ -41,7 +41,7 @@ goto :START_KEYCLOAK
 echo.
 echo [2/6] Starting Keycloak 26+ IAM Server on port 8088...
 if exist "%KC_BIN%\kc.bat" (
-    start "OmniBus - Keycloak IAM (Port 8088)" /min cmd /c "cd /d "%KC_BIN%" && kc.bat start-dev --http-port=8088"
+    start "OmniBus - Keycloak IAM (Port 8088)" /min cmd /c "cd /d "%KC_BIN%" && kc.bat start-dev --http-port=8088 --import-realm"
 ) else (
     echo Keycloak directory not found in tools.
 )
@@ -52,7 +52,7 @@ start "OmniBus - Service Registry" /min cmd /c "cd /d "%BASE_DIR%service-registr
 timeout /t 5 >nul
 
 echo.
-echo [4/6] Starting API Gateway & Auth Orchestrator (Port 8080)...
+echo [4/6] Starting API Gateway (Port 8080)...
 start "OmniBus - Gateway" /min cmd /c "cd /d "%BASE_DIR%gateway" && "%MVN_CMD%" spring-boot:run"
 timeout /t 4 >nul
 

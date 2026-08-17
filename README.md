@@ -10,6 +10,11 @@
 
 > **OmniBus** is an enterprise-grade, cloud-native intercity bus reservation, live 2x2 cabin seat mapping, and fleet management platform engineered with modern microservices, reactive event-driven choreography, distributed concurrency locking, and zero-trust BFF (Backend-for-Frontend) security.
 
+### 📖 Platform Documentation & Guides:
+* 🎮 **[Prototype Playbook & Business Functionality Guide](file:///c:/Personal-Project/microservice-main/microservice-main/APPLICATION_USER_GUIDE.md)** — Step-by-step walkthrough of business workflows, demo scenarios, and persona walkthroughs.
+* 🛠️ **[Developer & Engineering Architecture Guide](file:///c:/Personal-Project/microservice-main/microservice-main/DEVELOPER_GUIDE.md)** — In-depth 15-section technical handbook, distributed locking, and Kubernetes Gateway API.
+* 🛡️ **[Security Standards & Zero-Trust Whitepaper](file:///c:/Personal-Project/microservice-main/microservice-main/SECURITY_STANDARDS_COMPLIANCE.md)** — OWASP Top 10, CWE-400 mitigation, rotating HMAC secrets, and NIST SP 800-63B audit.
+
 ---
 
 ## 📌 Architecture Overview (Pattern 3: Decentralized Embedded BFF)
@@ -72,11 +77,12 @@ OmniBus implements the **IETF OAuth 2.0 Security Best Current Practice (BCP)** u
 | Service / Module | Port | Tech Stack | Core Responsibilities | Interactive Docs |
 | :--- | :--- | :--- | :--- | :--- |
 | **`common-security`** | *(Library)* | Spring Boot MVC + Valkey | Decentralized Embedded BFF Filter, Session Manager, Token Refresher | — |
+| **`keycloak-captcha-spi`** | *(Plugin)* | Java 21 + Keycloak SPI | Server-side cryptographic CAPTCHA Authenticator SPI plugin | — |
 | **`gateway`** | `8080` | Spring Cloud Gateway | 100% Stateless Pure L7 Reverse Proxy, URL Dispatch, Global CORS | — |
-| **`adminservice`** | `8081` | Spring Boot 3.2 + H2 JPA | Fleet operations, coach CRUD, pricing, route schedules, revenue KPI | [Swagger UI](http://localhost:8081/swagger-ui/index.html) |
-| **`bookingservice`** | `8083` | Spring Boot 3.2 + H2 JPA | Ticket reservations, cancellation, user booking history | [Swagger UI](http://localhost:8083/swagger-ui/index.html) |
-| **`inventoryservice`** | `8084` | Spring Boot 3.2 + H2 JPA | Interactive 2x2 seat cabin layout, real-time seat lock, availability | [Swagger UI](http://localhost:8084/swagger-ui/index.html) |
-| **`paymentservice`** | `8085` | Spring Boot 3.2 + RabbitMQ | Distributed saga payment processing, asynchronous event listener | [Swagger UI](http://localhost:8085/swagger-ui/index.html) |
+| **`adminservice`** | `8081` | Spring Boot 3.5.16 + Java 21 | Fleet operations, coach CRUD, pricing, route schedules, revenue KPI | [Swagger UI](http://localhost:8081/swagger-ui/index.html) |
+| **`bookingservice`** | `8083` | Spring Boot 3.5.16 + Java 21 | Ticket reservations, cancellation, user booking history | [Swagger UI](http://localhost:8083/swagger-ui/index.html) |
+| **`inventoryservice`** | `8084` | Spring Boot 3.5.16 + Java 21 | Interactive 2x2 seat cabin layout, real-time seat lock, availability | [Swagger UI](http://localhost:8084/swagger-ui/index.html) |
+| **`paymentservice`** | `8085` | Spring Boot 3.5.16 + Java 21 | Distributed saga payment processing, asynchronous event listener | [Swagger UI](http://localhost:8085/swagger-ui/index.html) |
 | **`service-registry`** | `8761` | Netflix Eureka | Dynamic microservice discovery and heartbeat health monitoring | [Dashboard](http://localhost:8761) |
 | **`keycloak`** | `8088` | Keycloak 26.0.7 IAM | OpenID Connect Identity Provider, RBAC roles (`ADMIN`, `USER`) | [Admin Console](http://localhost:8088/admin) |
 | **`valkey`** | `6379` | Valkey 8.0 Alpine | Distributed concurrency mutex, zero-parsing session cache | — |
@@ -119,12 +125,13 @@ stop-all.bat
 
 | Console / Application | URL | Username | Password | Role / Permissions |
 | :--- | :--- | :--- | :--- | :--- |
+| **Keycloak Themed Login (OmniBus)** | [http://localhost:8088/realms/bus-reservation/...](http://localhost:8088/realms/bus-reservation/account) | `admin` / `john_doe` | `admin123` / `user123` | Native Vector SVG CAPTCHA + PKCE Authorization Code Flow |
 | **Angular 21 Frontend** | [http://localhost:4200](http://localhost:4200) | `admin` | `admin123` | `ROLE_ADMIN` (Fleet Ops, Bookings, Analytics) |
 | **Customer Booking Portal** | [http://localhost:4200/booking](http://localhost:4200/booking) | `john_doe` | `user123` | `ROLE_USER` (2x2 Seat Picker, Boarding Passes) |
 | **Keycloak Admin Console** | [http://localhost:8088/admin](http://localhost:8088/admin) | `admin` | `admin` | Master Realm & IAM Configuration |
 | **Eureka Dashboard** | [http://localhost:8761](http://localhost:8761) | — | — | Live Microservice Discovery Heartbeats |
 | **RabbitMQ Management** | [http://localhost:15672](http://localhost:15672) | `guest` | `guest` | Message Queues, Exchanges & Channels |
-| **API Gateway** | [http://localhost:8080](http://localhost:8080) | — | — | Unified Reverse Proxy Entry Point |
+| **API Gateway** | [http://localhost:8080](http://localhost:8080) | — | — | 100% Stateless Pure L7 Reverse Proxy |
 
 ---
 

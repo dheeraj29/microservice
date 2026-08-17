@@ -203,6 +203,11 @@ Keycloak 26+ serves as the centralized OpenID Connect (OIDC) & OAuth 2.1 Identit
    * Keycloak acts as an Identity Broker for corporate SAML/OIDC IDPs (Azure Active Directory / Entra ID, Okta). The `/realms/bus-reservation/broker/` redirect URI is whitelisted on the edge for Microsoft/Okta browser returns.
 9. **Production Server Optimization**:
    * Keycloak container runs in optimized mode (`kc.sh start --optimized`) with PostgreSQL backing, managed connection pooling, and Infinispan distributed session clustering.
+10. **Keycloak Custom Theme (`omnibus`)**:
+   * FreeMarker login & logout templates (`tools/keycloak-26.0.7/themes/omnibus/login/login.ftl` and `logout-confirm.ftl`) providing modern glassmorphic transport styling, high-DPI vector SVG challenges, 1-click refresh 🔄, and demo credentials helpers.
+11. **Server-Side CAPTCHA Authenticator SPI (`keycloak-captcha-spi`) & Native Brute Force Protection**:
+   * Custom `ValkeyCaptchaAuthenticator` SPI deployed to Keycloak `providers/` enforcing server-side time-bounded cryptographic HMAC CAPTCHA validation **before** checking passwords (immune to direct curl/POST bypass).
+   * Keycloak Native Brute Force Protection enabled (`bruteForceProtected: true`, max 5 failed attempts $\rightarrow$ 15-minute lockout).
 
 ---
 
@@ -494,6 +499,42 @@ spec:
           port: 80
 ```
 
+### 🚦 Kubernetes Gateway API / Envoy Rate Limiting ([`envoy/ratelimit-policy.yaml`](file:///c:/Personal-Project/microservice-main/microservice-main/envoy/ratelimit-policy.yaml))
+Rate limiting is enforced at the Kubernetes ingress edge using declarative `RateLimitPolicy` (without baking restrictive, hard-to-migrate logic into application microservice code):
+
+```yaml
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: RateLimitPolicy
+metadata:
+  name: omnibus-rate-limit-policy
+  namespace: default
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: omnibus-http-routes
+  global:
+    rules:
+      # 1. Protection on CAPTCHA Generation (Anti-Scraping / Anti-Flooding)
+      - clientSelectors:
+          - headers:
+              - name: ":path"
+                value: "^/auth/captcha.*"
+                type: RegularExpression
+        limit:
+          requests: 15
+          unit: Minute
+      # 2. Protection on Direct Login (Anti-Brute Force / Anti-Credential Stuffing)
+      - clientSelectors:
+          - headers:
+              - name: ":path"
+                value: "^/auth/login.*"
+                type: RegularExpression
+        limit:
+          requests: 5
+          unit: Minute
+```
+
 ---
 
 ## 9. Resilience, Retry & Circuit Breakers
@@ -543,18 +584,49 @@ public ResponseEntity<BookingModel> bookingFallback(Exception ex) {
 
 ---
 
-## 11. Service Discovery & Fast Registry Synchronization
+## 11. Service Discovery & HealthCheck-Bound Fast Synchronization
 
-To eliminate initial `503 Service Unavailable` errors when instances start up, all microservices and Gateway configure fast 5-second Eureka heartbeat and registry fetch intervals:
+To eliminate premature routing and `503 Service Unavailable` errors during service startup or restarts, OmniBus enforces **HealthCheck-Bound Registration** and **sub-second cache synchronization**:
+
+### 🛡️ 1. HealthCheck-Bound Registration (`STARTING` $\rightarrow$ `UP`)
+* **Initial Status**: Microservices register with `eureka.instance.initial-status=STARTING`. Eureka blocks ingress traffic while Spring Boot binds ports and verifies database connection pools.
+* **Actuator HealthCheck Binding**: `eureka.client.healthcheck.enabled=true` binds Eureka status directly to Spring Boot Actuator (`/actuator/health`). Only when Actuator reports `{"status":"UP"}` does Eureka flip the instance to `UP`.
 
 ```properties
+# Microservices Configuration (common-application.properties)
 eureka.client.service-url.defaultZone=http://localhost:8761/eureka/
 eureka.client.register-with-eureka=true
 eureka.client.fetch-registry=true
-eureka.client.registry-fetch-interval-seconds=5
+eureka.client.healthcheck.enabled=true
+eureka.client.registry-fetch-interval-seconds=3
 eureka.instance.prefer-ip-address=true
-eureka.instance.lease-renewal-interval-in-seconds=5
-eureka.instance.lease-expiration-duration-in-seconds=10
+eureka.instance.initial-status=STARTING
+eureka.instance.lease-renewal-interval-in-seconds=3
+eureka.instance.lease-expiration-duration-in-seconds=6
+```
+
+### ⚡ 2. Eureka Server Sub-Second Cache Eviction (`service-registry`)
+```properties
+eureka.server.response-cache-update-interval-ms=1000
+eureka.server.eviction-interval-timer-in-ms=2000
+eureka.server.enable-self-preservation=false
+```
+
+### 🔄 3. Gateway Responsive Load Balancer Cache (`gateway`)
+```yaml
+spring:
+  cloud:
+    loadbalancer:
+      cache:
+        ttl: 2s            # Evicts dead/stale instance pointers every 2 seconds
+        capacity: 256
+eureka:
+  client:
+    healthcheck:
+      enabled: true
+    registry-fetch-interval-seconds: 2
+  instance:
+    initial-status: STARTING
 ```
 
 ---
@@ -601,8 +673,8 @@ export const loginInterceptor: HttpInterceptorFn = (req, next) => {
 
 | Service | Port | Base Path | Core Endpoints & Responsibilities |
 | :--- | :--- | :--- | :--- |
-| **API Gateway** | `8080` | `/` | Ingress Routing, `/auth/login`, `/auth/callback`, `/auth/user`, `/auth/logout` |
-| **Admin Service** | `8081` | `/adminservice/v1` | `/addBusDetails`, `/allBuses`, `/dashboardStats`, `/findBusDetailsByNumber` |
+| **API Gateway** | `8080` | `/` | 100% Pure Ingress Routing (`/adminservice/**`, `/bookingservice/**`, `/auth/**`, `/**`) |
+| **Admin Service** | `8081` | `/adminservice/v1` | `/addBusDetails`, `/allBuses`, `/dashboardStats`, `/findBusDetailsByNumber`, `/auth/**` |
 | **Booking Service**| `8083` | `/bookingservice/v1`| `/bookSeat`, `/getBookingHistory`, `/cancelBooking` |
 | **Inventory Service**| `8084`| `/inventoryservice/v1`| `/seatAvailability`, `/reserveSeat`, `/releaseSeat` |
 | **Payment Service** | `8085` | `/paymentservice/v1`| `/processPayment`, `/paymentStatus`, `/refundPayment` |
@@ -610,14 +682,14 @@ export const loginInterceptor: HttpInterceptorFn = (req, next) => {
 | **Netflix Eureka** | `8761` | `/eureka` | Service Discovery & Registration Registry |
 | **Valkey OSS** | `6379` | `localhost:6379` | Distributed Session Store & M2M Token Cache |
 | **RabbitMQ** | `5672` | `localhost:5672` | Event Streaming Broker (Management UI: `15672`) |
-| **Angular Frontend**| `4200` | `/` | Customer Reservation UI & Admin Fleet Management Portal |
+| **Angular Frontend**| `4200` | `/` | Customer Reservation UI, Admin Fleet Portal, `/login` & `/logout` |
 
 ---
 
 ## 14. Local Development & Startup Guide
 
 ### 📋 Prerequisites
-* **Java 17+ (JDK)** installed and on PATH.
+* **Java 21+ LTS (JDK)** installed and on PATH.
 * **Node.js 20+** & npm installed.
 * **Podman** or **Docker Desktop** installed and running.
 

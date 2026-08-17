@@ -49,12 +49,12 @@ export class SelectpageComponent implements OnInit {
   }
 
   login() {
-    this.userService.loginWithKeycloak();
+    this.router.navigate(['/login']);
   }
 
   navigateTo(path: string) {
     if (!this.userService.isAuthenticated()) {
-      this.userService.loginWithKeycloak();
+      this.router.navigate(['/login'], { queryParams: { redirect: path } });
     } else {
       this.router.navigate([path]);
     }

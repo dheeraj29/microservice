@@ -14,7 +14,7 @@ export class AppComponent {
   private router = inject(Router);
 
   login() {
-    this.userService.loginWithKeycloak();
+    this.router.navigate(['/login']);
   }
 
   logout() {
