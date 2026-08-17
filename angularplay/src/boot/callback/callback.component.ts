@@ -68,7 +68,7 @@ export class CallbackComponent implements OnInit {
               roles: res.roles || []
             });
 
-            if (res.targetUrl) {
+            if (res.targetUrl && res.targetUrl !== '/logout' && res.targetUrl !== '/login' && res.targetUrl !== '/callback') {
               this.router.navigateByUrl(res.targetUrl);
             } else if (res.isAdmin) {
               this.router.navigate(['/admin']);

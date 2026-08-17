@@ -57,10 +57,12 @@
           <i class="bi bi-box-arrow-right"></i>
         </button>
       } @else {
-        <!-- Sign In Button -->
-        <button type="button" class="btn-modern btn-primary btn-sm" (click)="login()">
-          <i class="bi bi-box-arrow-in-right"></i> Sign In
-        </button>
+        <!-- Sign In Button (hidden when viewing logout screen) -->
+        @if (router.url !== '/logout') {
+          <button type="button" class="btn-modern btn-primary btn-sm" (click)="login()">
+            <i class="bi bi-box-arrow-in-right"></i> Sign In
+          </button>
+        }
       }
     </div>
   </header>

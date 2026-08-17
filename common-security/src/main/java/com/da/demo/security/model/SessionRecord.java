@@ -22,6 +22,10 @@ public class SessionRecord implements Serializable {
     private Instant createdAt = Instant.now();
     private Instant lastAccessedAt = Instant.now();
     private String clientFingerprint;
+    private String language = "en";
+    private String timezone = "Asia/Kolkata";
+    private String homepage = "/booking";
+    private String theme = "dark";
 
     public SessionRecord() {}
 
@@ -72,4 +76,16 @@ public class SessionRecord implements Serializable {
 
     public String getClientFingerprint() { return clientFingerprint; }
     public void setClientFingerprint(String clientFingerprint) { this.clientFingerprint = clientFingerprint; }
+
+    public String getLanguage() { return language; }
+    public void setLanguage(String language) { this.language = language; }
+
+    public String getTimezone() { return timezone; }
+    public void setTimezone(String timezone) { this.timezone = timezone; }
+
+    public String getHomepage() { return homepage; }
+    public void setHomepage(String homepage) { this.homepage = homepage; }
+
+    public String getTheme() { return theme; }
+    public void setTheme(String theme) { this.theme = theme; }
 }

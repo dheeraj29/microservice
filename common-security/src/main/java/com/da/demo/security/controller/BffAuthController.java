@@ -21,6 +21,8 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -74,6 +76,9 @@ public class BffAuthController {
             return null;
         }
         String trimmed = redirect.trim();
+        if ("/logout".equals(trimmed) || "/login".equals(trimmed) || "/callback".equals(trimmed) || "/".equals(trimmed)) {
+            return null;
+        }
         if (trimmed.startsWith("/") && !trimmed.startsWith("//") && !trimmed.contains("\\")) {
             return trimmed;
         }
@@ -133,6 +138,10 @@ public class BffAuthController {
             resp.put("username", session.getUsername());
             resp.put("roles", session.getRoles());
             resp.put("isAdmin", isAdmin);
+            resp.put("language", session.getLanguage());
+            resp.put("timezone", session.getTimezone());
+            resp.put("homepage", session.getHomepage());
+            resp.put("theme", session.getTheme());
             if (targetUrl != null && !targetUrl.isBlank()) {
                 resp.put("targetUrl", targetUrl);
             }
@@ -168,6 +177,41 @@ public class BffAuthController {
         userInfo.put("username", session.getUsername());
         userInfo.put("roles", session.getRoles());
         userInfo.put("isAdmin", session.getRoles().contains("ROLE_ADMIN") || session.getRoles().contains("ADMIN"));
+        userInfo.put("language", session.getLanguage());
+        userInfo.put("timezone", session.getTimezone());
+        userInfo.put("homepage", session.getHomepage());
+        userInfo.put("theme", session.getTheme());
+        return ResponseEntity.ok(userInfo);
+    }
+
+    /**
+     * Update user preferences (language, timezone, homepage, theme) in the current session.
+     */
+    @PutMapping("/user/preferences")
+    public ResponseEntity<Map<String, Object>> updatePreferences(@RequestBody Map<String, String> preferences,
+                                                                 HttpServletRequest request) {
+        String sessionId = extractSessionCookie(request);
+        if (sessionId == null || sessionId.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        SessionRecord updated = sessionManager.updateUserPreferences(sessionId, preferences);
+        if (updated == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        // Persist to Keycloak database using User's Own Bearer Token (Least Privilege)
+        keycloakAuthService.updateUserAttributesInKeycloak(updated.getAccessToken(), updated.getUsername(), preferences);
+
+        Map<String, Object> userInfo = new HashMap<>();
+        userInfo.put("authenticated", true);
+        userInfo.put("username", updated.getUsername());
+        userInfo.put("roles", updated.getRoles());
+        userInfo.put("isAdmin", updated.getRoles().contains("ROLE_ADMIN") || updated.getRoles().contains("ADMIN"));
+        userInfo.put("language", updated.getLanguage());
+        userInfo.put("timezone", updated.getTimezone());
+        userInfo.put("homepage", updated.getHomepage());
+        userInfo.put("theme", updated.getTheme());
         return ResponseEntity.ok(userInfo);
     }
 

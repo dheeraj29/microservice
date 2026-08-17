@@ -8,6 +8,10 @@ export interface UserProfile {
   fullName: string;
   email: string;
   roles: string[];
+  language?: string;
+  timezone?: string;
+  homepage?: string;
+  theme?: string;
 }
 
 export interface BffUserResponse {
@@ -15,6 +19,10 @@ export interface BffUserResponse {
   username: string;
   roles: string[];
   isAdmin: boolean;
+  language?: string;
+  timezone?: string;
+  homepage?: string;
+  theme?: string;
 }
 
 @Injectable({
@@ -43,7 +51,11 @@ export class UserService {
    * Initiates OIDC Federated SSO Login redirect via Keycloak (prompt=login forced).
    */
   loginWithKeycloak(redirectPath?: string) {
-    const target = redirectPath || (window.location.pathname !== '/' && window.location.pathname !== '/callback' && window.location.pathname !== '/login' ? window.location.pathname + window.location.search : '');
+    const isSpecialPath = window.location.pathname === '/' ||
+                          window.location.pathname === '/callback' ||
+                          window.location.pathname === '/login' ||
+                          window.location.pathname === '/logout';
+    const target = redirectPath || (!isSpecialPath ? window.location.pathname + window.location.search : '');
     if (target) {
       window.location.href = `${this.bffAuthUrl}/login?redirect=${encodeURIComponent(target)}`;
     } else {
@@ -63,7 +75,11 @@ export class UserService {
             username: res.username,
             fullName: res.username,
             email: '',
-            roles: res.roles || []
+            roles: res.roles || [],
+            language: res.language || 'en',
+            timezone: res.timezone || 'Asia/Kolkata',
+            homepage: res.homepage || '/booking',
+            theme: res.theme || 'dark'
           });
         } else {
           this.currentUser.set(null);
@@ -78,6 +94,32 @@ export class UserService {
     );
   }
 
+  /**
+   * Update user preferences (language, timezone, homepage, theme) across cluster session.
+   */
+  updatePreferences(prefs: { language?: string; timezone?: string; homepage?: string; theme?: string }): Observable<UserProfile | null> {
+    return this.http.put<BffUserResponse>(`${this.bffAuthUrl}/user/preferences`, prefs, { withCredentials: true }).pipe(
+      map(res => {
+        if (res && res.authenticated) {
+          const profile: UserProfile = {
+            username: res.username,
+            fullName: res.username,
+            email: '',
+            roles: res.roles || [],
+            language: res.language || 'en',
+            timezone: res.timezone || 'Asia/Kolkata',
+            homepage: res.homepage || '/booking',
+            theme: res.theme || 'dark'
+          };
+          this.currentUser.set(profile);
+          return profile;
+        }
+        return null;
+      }),
+      catchError(() => of(null))
+    );
+  }
+
   hasRole(role: string): boolean {
     const user = this.currentUser();
     if (!user || !user.roles) return false;
@@ -86,10 +128,19 @@ export class UserService {
   }
 
   /**
-   * Terminate session via API and redirect to Keycloak themed logout page.
+   * Terminate session via API and route to the Signed Out Confirmation page.
    */
   logout() {
-    window.location.href = `${this.bffAuthUrl}/logout`;
+    this.http.post(`${this.bffAuthUrl}/logout`, {}, { withCredentials: true }).subscribe({
+      next: () => {
+        this.currentUser.set(null);
+        this.router.navigate(['/logout']);
+      },
+      error: () => {
+        this.currentUser.set(null);
+        this.router.navigate(['/logout']);
+      }
+    });
   }
 }
 

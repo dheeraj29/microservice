@@ -11,7 +11,7 @@ import { Router } from '@angular/router';
 export class AppComponent {
   title = 'OmniBus';
   userService = inject(UserService);
-  private router = inject(Router);
+  router = inject(Router);
 
   login() {
     this.router.navigate(['/login']);

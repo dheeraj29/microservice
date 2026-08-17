@@ -21,7 +21,12 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="password" class="form-label">Password</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label for="password" class="form-label" style="margin-bottom: 0;">Password</label>
+                        <#if realm.resetPasswordAllowed>
+                            <a tabindex="5" href="${url.loginResetCredentialsUrl}" class="link-forgot-password">Forgot Password?</a>
+                        </#if>
+                    </div>
                     <input tabindex="2" id="password" class="form-input" name="password" type="password" autocomplete="off" placeholder="••••••••" required />
                 </div>
 

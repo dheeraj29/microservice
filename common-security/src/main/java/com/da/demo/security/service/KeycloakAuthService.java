@@ -149,4 +149,53 @@ public class KeycloakAuthService {
             return "authenticated_user";
         }
     }
+
+    public String extractCustomClaim(String accessToken, String claimName, String defaultValue) {
+        try {
+            JWT jwt = JWTParser.parse(accessToken);
+            JWTClaimsSet claims = jwt.getJWTClaimsSet();
+            String val = claims.getStringClaim(claimName);
+            return (val != null && !val.isBlank()) ? val : defaultValue;
+        } catch (Exception e) {
+            return defaultValue;
+        }
+    }
+
+    public void updateUserAttributesInKeycloak(String userAccessToken, String username, Map<String, String> attributes) {
+        if (userAccessToken == null || userAccessToken.isBlank() || attributes == null || attributes.isEmpty()) {
+            return;
+        }
+
+        // Pure Self-Service Least Privilege: User updates only their own account attributes
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(userAccessToken);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            String accountUrl = String.format("%s/realms/%s/account", keycloakUrl, realm);
+            HttpEntity<?> getReq = new HttpEntity<>(headers);
+            ResponseEntity<Map> accResp = restTemplate.exchange(accountUrl, org.springframework.http.HttpMethod.GET, getReq, Map.class);
+
+            if (accResp.getStatusCode().is2xxSuccessful() && accResp.getBody() != null) {
+                Map<String, Object> accountData = new java.util.HashMap<>(accResp.getBody());
+                Map<String, Object> existingAttributes = (Map<String, Object>) accountData.get("attributes");
+                if (existingAttributes == null) {
+                    existingAttributes = new java.util.HashMap<>();
+                } else {
+                    existingAttributes = new java.util.HashMap<>(existingAttributes);
+                }
+
+                for (Map.Entry<String, String> entry : attributes.entrySet()) {
+                    existingAttributes.put(entry.getKey(), List.of(entry.getValue()));
+                }
+                accountData.put("attributes", existingAttributes);
+
+                HttpEntity<Map<String, Object>> postReq = new HttpEntity<>(accountData, headers);
+                restTemplate.exchange(accountUrl, org.springframework.http.HttpMethod.POST, postReq, Void.class);
+                log.info("Successfully persisted user '{}' preferences to Keycloak using User Bearer Token: {}", username, attributes.keySet());
+            }
+        } catch (Exception e) {
+            log.warn("User Bearer Token Keycloak Account API note for '{}': {}", username, e.getMessage());
+        }
+    }
 }

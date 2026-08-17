@@ -34,11 +34,8 @@ import { UserService } from '../../services/loginhandler.service';
         </div>
 
         <div class="action-buttons-group">
-          <button class="btn-primary" (click)="loginAgain()">
-            Sign In Again ➔
-          </button>
-          <button class="btn-secondary" (click)="goHome()">
-            Return to Home 🏠
+          <button class="btn-primary" (click)="goHome()">
+            Return to Home Page 🏠
           </button>
         </div>
 
@@ -190,14 +187,9 @@ import { UserService } from '../../services/loginhandler.service';
   standalone: false
 })
 export class LogoutComponent {
-  private userService = inject(UserService);
   private router = inject(Router);
 
-  loginAgain() {
-    this.userService.loginWithKeycloak();
-  }
-
   goHome() {
-    this.router.navigate(['/home']);
+    this.router.navigate(['/']);
   }
 }

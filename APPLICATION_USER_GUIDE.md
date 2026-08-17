@@ -184,6 +184,27 @@ When logged in as `john_doe` (or visiting `/booking`):
 
 ---
 
+### Scenario E: User Profile & Dynamic Custom Preferences
+> **Goal**: Inspect and update custom user settings (`language`, `timezone`, `homepage`, `theme`).
+
+1. Open DevTools Console (`F12`) or inspect the `/auth/user` endpoint:
+   * Returns current user identity + custom attributes:
+     ```json
+     {
+       "authenticated": true,
+       "username": "admin",
+       "roles": ["ADMIN"],
+       "isAdmin": true,
+       "language": "en",
+       "timezone": "Asia/Kolkata",
+       "homepage": "/admin/dashboard",
+       "theme": "dark"
+     }
+     ```
+2. The user can dynamically update their preferences at any time via `PUT /auth/user/preferences`, syncing seamlessly across all backend instances via Valkey!
+
+---
+
 ## 5. 🖥️ Interactive Monitoring & Console Directory
 
 | Console / Tool | Direct URL | Default Login | Purpose / What to Inspect |

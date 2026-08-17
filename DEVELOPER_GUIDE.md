@@ -38,7 +38,7 @@ The **OmniBus Enterprise Platform** is a resilient, distributed bus reservation 
 ```mermaid
 flowchart TB
     subgraph Client Tier
-        UI["Angular 19+ SPA (Port 4200)<br/>Signals • Standalone • HttpOnly Cookie"]
+        UI["Angular 21 SPA (Port 4200)<br/>Signals • Standalone • HttpOnly Cookie"]
         Swagger["OpenAPI 3.0 / Swagger UI<br/>OAuth 2.0 Auth Code + PKCE"]
     end
 
@@ -167,7 +167,16 @@ Keycloak 26+ serves as the centralized OpenID Connect (OIDC) & OAuth 2.1 Identit
 * **Role Hierarchy**:
   * `ADMIN` / `ROLE_ADMIN`: Administrative operations (coach creation, fleet pricing, inventory initialization, Prometheus metrics).
   * `USER` / `ROLE_USER`: Standard passenger privileges (route searching, seat booking, ticket viewing/cancellation).
-* **Dual Role Claim Mappings**: Built-in Keycloak mappers inject roles into both `realm_access.roles` and Spring Security standard claim paths (`ROLE_ADMIN`, `ROLE_USER`) ensuring seamless integration with `@PreAuthorize("hasRole('ADMIN')")`.
+* **Clean Role Mappings**: Keycloak defines clean business roles (`ADMIN`, `USER`). Downstream microservices (`common-security`) dynamically map them to Spring Security `ROLE_ADMIN` and `ROLE_USER` for `@PreAuthorize("hasRole('ADMIN')")` evaluation.
+* **Streamlined Client Scopes**:
+  * Active scopes: `openid`, `profile`, `email`, `roles`, and `web-origins`.
+  * Redundant/unused scopes (`phone`, `address`, `microprofile-jwt`, `offline_access`, `organization`, `acr`) are purged from the realm to reduce token payload size and eliminate misconfiguration attack surface.
+* **User Custom Preferences & Self-Service Attributes**:
+  * Users declare custom attributes in Keycloak: `language` (e.g. `en`), `timezone` (e.g. `Asia/Kolkata`), `homepage` (e.g. `/booking`), and `theme` (e.g. `dark`).
+  * OIDC `ProtocolMappers` inject these attributes directly into ID Tokens, UserInfo, and Access Token claims.
+  * The BFF Gateway exposes `PUT /auth/user/preferences`:
+    * Immediately updates the distributed Valkey session cache for sub-millisecond frontend reactivity.
+    * Persists updates directly to Keycloak using the **User's Active Bearer Token** via Keycloak's standard self-service User Account API (`POST /realms/{realm}/account`) — enforcing **Strict Least Privilege** with zero admin or M2M privilege escalation.
 
 ---
 
@@ -177,7 +186,6 @@ Keycloak 26+ serves as the centralized OpenID Connect (OIDC) & OAuth 2.1 Identit
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | `angular-client` | Public | None (Public) | Authorization Code + PKCE | Strict Whitelist (`:4200`, `:8080`, `:8081`...) | Angular SPA & Swagger UI |
 | `internal-backend-client` | Confidential | `client-secret` | Client Credentials (`service-account`) | N/A (Cluster internal) | OpenFeign M2M Service Mesh |
-| `envoy-client` | Confidential | `client-secret` | Authorization Code + Refresh Token | Strict Whitelist | Gateway BFF Orchestrator |
 
 ---
 
@@ -204,7 +212,16 @@ Keycloak 26+ serves as the centralized OpenID Connect (OIDC) & OAuth 2.1 Identit
 9. **Production Server Optimization**:
    * Keycloak container runs in optimized mode (`kc.sh start --optimized`) with PostgreSQL backing, managed connection pooling, and Infinispan distributed session clustering.
 10. **Keycloak Custom Theme (`omnibus`)**:
-   * FreeMarker login & logout templates (`tools/keycloak-26.0.7/themes/omnibus/login/login.ftl` and `logout-confirm.ftl`) providing modern glassmorphic transport styling, high-DPI vector SVG challenges, 1-click refresh 🔄, and demo credentials helpers.
+   * **Theme Templates**:
+  * `login.ftl`: Glassmorphic login card with native vector SVG CAPTCHA, 1-click refresh 🔄, and demo credentials pills.
+  * `login-reset-password.ftl`: Custom themed Account Recovery / Forgot Password screen.
+  * `login-update-password.ftl`: Custom themed Set / Update New Password screen with complexity badge.
+  * `login-config-totp.ftl`: Custom themed MFA Two-Factor Authentication setup with QR code scanner and manual key.
+  * `login-otp.ftl`: Custom themed MFA OTP 6-digit authentication verification screen.
+  * `logout-confirm.ftl`: Custom themed logout confirmation screen.
+  * `info.ftl`: Themed informational / status notice screen.
+  * `error.ftl`: Themed authentication error & audit notice screen.
+  * `resources/css/login.css`: Centralized CSS tokens & dark glassmorphism styling across all auth screens.
 11. **Server-Side CAPTCHA Authenticator SPI (`keycloak-captcha-spi`) & Native Brute Force Protection**:
    * Custom `ValkeyCaptchaAuthenticator` SPI deployed to Keycloak `providers/` enforcing server-side time-bounded cryptographic HMAC CAPTCHA validation **before** checking passwords (immune to direct curl/POST bypass).
    * Keycloak Native Brute Force Protection enabled (`bruteForceProtected: true`, max 5 failed attempts $\rightarrow$ 15-minute lockout).
@@ -352,7 +369,10 @@ When `BookingService` needs to check seat availability or reserve capacity in `I
 }
 ```
 
-### 💻 OpenFeign Request Interceptor (`FeignAuthRequestInterceptor.java`)
+### 💻 Dual-Mode OpenFeign Request Interceptor (`FeignAuthRequestInterceptor.java`)
+
+The Feign interceptor intelligently determines whether the call is triggered by an active user or a background worker:
+
 ```java
 @Component
 public class FeignAuthRequestInterceptor implements RequestInterceptor {
@@ -364,10 +384,44 @@ public class FeignAuthRequestInterceptor implements RequestInterceptor {
 
     @Override
     public void apply(RequestTemplate template) {
-        // Automatically injects cached Bearer JWT for all inter-service Feign calls
-        String token = m2mTokenService.getOrFetchServiceToken();
-        if (token != null && !token.isBlank()) {
-            template.header("Authorization", "Bearer " + token);
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+
+        if (attributes != null && attributes.getRequest() != null) {
+            // CASE 1: User-Initiated Request (Context & Session Relay)
+            HttpServletRequest request = attributes.getRequest();
+
+            // 1. Relay Session Cookies (__Host-OmniSession)
+            if (request.getCookies() != null) {
+                StringBuilder cookieHeader = new StringBuilder();
+                for (Cookie cookie : request.getCookies()) {
+                    if ("__Host-OmniSession".equals(cookie.getName()) || "OmniSession".equals(cookie.getName())) {
+                        if (cookieHeader.length() > 0) cookieHeader.append("; ");
+                        cookieHeader.append(cookie.getName()).append("=").append(cookie.getValue());
+                    }
+                }
+                if (cookieHeader.length() > 0) {
+                    template.header("Cookie", cookieHeader.toString());
+                }
+            }
+
+            // 2. Relay Authorization Header if present
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && !authHeader.isBlank()) {
+                template.header("Authorization", authHeader);
+            }
+
+            // 3. Relay X-Authenticated-User Header
+            String authUser = request.getHeader("X-Authenticated-User");
+            if (authUser != null && !authUser.isBlank()) {
+                template.header("X-Authenticated-User", authUser);
+            }
+        } else {
+            // CASE 2: @Scheduled Scheduler / Async Worker / Background Thread (M2M Client Credentials)
+            String m2mToken = m2mTokenService.getInternalM2MToken();
+            if (m2mToken != null && !m2mToken.isBlank()) {
+                template.header("Authorization", "Bearer " + m2mToken);
+                template.header("X-Authenticated-User", "system_scheduler");
+            }
         }
     }
 }
@@ -498,6 +552,13 @@ spec:
         - name: frontend
           port: 80
 ```
+
+* **Module**: [`keycloak-captcha-spi`](file:///c:/Personal-Project/microservice-main/microservice-main/keycloak-captcha-spi/) (`ValkeyCaptchaAuthenticator.java` & `ValkeyClient.java`)
+* **Multi-Instance / Cluster Synchronization**:
+  * **Valkey Cluster Secret Sync**: The cluster-wide rotating HMAC secret is shared across all Keycloak instances via Valkey (`keycloak:captcha:cluster_secret`) or external environment variable `KEYCLOAK_CAPTCHA_SECRET`. Any Keycloak instance can generate a challenge, and any other instance can validate it.
+  * **Distributed Single-Use Replay Protection**: Token signatures are atomically recorded in Valkey upon submission (`SET captcha:used:<sig> 1 EX 120 NX`), ensuring an attacker cannot replay a captured CAPTCHA token to bypass verification on another pod.
+  * **Zero-Downtime Resilience**: If Valkey is temporarily unreachable, Keycloak seamlessly falls back to the deterministic cluster HMAC signature with timestamp validation.
+* **100% Server Enforced**: Runs inside Keycloak's server-side authentication pipeline before credentials are evaluated. Direct API/curl POST attacks cannot bypass verification.
 
 ### 🚦 Kubernetes Gateway API / Envoy Rate Limiting ([`envoy/ratelimit-policy.yaml`](file:///c:/Personal-Project/microservice-main/microservice-main/envoy/ratelimit-policy.yaml))
 Rate limiting is enforced at the Kubernetes ingress edge using declarative `RateLimitPolicy` (without baking restrictive, hard-to-migrate logic into application microservice code):

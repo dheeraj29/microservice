@@ -1,105 +1,235 @@
 {
-  "realm": "bus-reservation",
-  "enabled": true,
-  "displayName": "Bus Reservation Identity System",
-  "sslRequired": "none",
-  "registrationAllowed": true,
-  "loginWithEmailAllowed": true,
-  "duplicateEmailsAllowed": false,
-  "resetPasswordAllowed": true,
-  "editUsernameAllowed": false,
-  "loginTheme": "omnibus",
-  "bruteForceProtected": true,
-  "maxFailureWaitSeconds": 900,
-  "minimumQuickLoginWaitSeconds": 2,
-  "waitIncrementSeconds": 60,
-  "quickLoginCheckMilliSeconds": 1000,
-  "maxDeltaTimeSeconds": 43200,
-  "failureFactor": 5,
-  "roles": {
-    "realm": [
-      {
-        "name": "ADMIN",
-        "description": "Administrator with full fleet and operations control"
-      },
-      {
-        "name": "USER",
-        "description": "Standard customer with ticket booking and viewing permissions"
-      },
-      {
-        "name": "ROLE_ADMIN",
-        "description": "Spring Security mapped Admin role"
-      },
-      {
-        "name": "ROLE_USER",
-        "description": "Spring Security mapped User role"
-      }
-    ]
-  },
-  "groups": [],
-  "users": [
-    {
-      "username": "admin",
-      "enabled": true,
-      "email": "admin@busreservation.local",
-      "firstName": "Admin",
-      "lastName": "Operator",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "admin123",
-          "temporary": false
-        }
-      ],
-      "realmRoles": [
-        "ADMIN",
-        "ROLE_ADMIN",
-        "USER",
-        "ROLE_USER"
-      ]
-    },
-    {
-      "username": "john_doe",
-      "enabled": true,
-      "email": "john@example.com",
-      "firstName": "John",
-      "lastName": "Doe",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "user123",
-          "temporary": false
-        }
-      ],
-      "realmRoles": [
-        "USER",
-        "ROLE_USER"
-      ]
-    }
-  ],
-  "clients": [
-    {
-      "clientId": "envoy-client",
-      "name": "Envoy Gateway Client",
-      "enabled": true,
-      "clientAuthenticatorType": "client-secret",
-      "secret": "envoy-client-secret-key-123",
-      "publicClient": false,
-      "standardFlowEnabled": true,
-      "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": true,
-      "serviceAccountsEnabled": true,
-      "redirectUris": [
-        "http://localhost:8080/*",
-        "http://localhost:8080/oauth2/callback",
-        "http://localhost:4200/*",
-        "http://localhost:4200/callback"
-      ],
-      "webOrigins": [
-        "http://localhost:8080",
-        "http://localhost:4200",
-        "+"
-      ]
-    }
-  ]
+    "id":  "e0c46d1b-f67e-45a7-a418-8ade8df10a87",
+    "realm":  "bus-reservation",
+    "displayName":  "Bus Reservation Identity System",
+    "notBefore":  0,
+    "defaultSignatureAlgorithm":  "RS256",
+    "revokeRefreshToken":  false,
+    "refreshTokenMaxReuse":  0,
+    "accessTokenLifespan":  300,
+    "accessTokenLifespanForImplicitFlow":  900,
+    "ssoSessionIdleTimeout":  1800,
+    "ssoSessionMaxLifespan":  36000,
+    "ssoSessionIdleTimeoutRememberMe":  0,
+    "ssoSessionMaxLifespanRememberMe":  0,
+    "offlineSessionIdleTimeout":  2592000,
+    "offlineSessionMaxLifespanEnabled":  false,
+    "offlineSessionMaxLifespan":  5184000,
+    "clientSessionIdleTimeout":  0,
+    "clientSessionMaxLifespan":  0,
+    "clientOfflineSessionIdleTimeout":  0,
+    "clientOfflineSessionMaxLifespan":  0,
+    "accessCodeLifespan":  60,
+    "accessCodeLifespanUserAction":  300,
+    "accessCodeLifespanLogin":  1800,
+    "actionTokenGeneratedByAdminLifespan":  43200,
+    "actionTokenGeneratedByUserLifespan":  300,
+    "oauth2DeviceCodeLifespan":  600,
+    "oauth2DevicePollingInterval":  5,
+    "enabled":  true,
+    "sslRequired":  "none",
+    "registrationAllowed":  true,
+    "registrationEmailAsUsername":  false,
+    "rememberMe":  false,
+    "verifyEmail":  false,
+    "loginWithEmailAllowed":  true,
+    "duplicateEmailsAllowed":  false,
+    "resetPasswordAllowed":  true,
+    "editUsernameAllowed":  false,
+    "bruteForceProtected":  true,
+    "permanentLockout":  false,
+    "maxTemporaryLockouts":  0,
+    "bruteForceStrategy":  "MULTIPLE",
+    "maxFailureWaitSeconds":  900,
+    "minimumQuickLoginWaitSeconds":  60,
+    "waitIncrementSeconds":  60,
+    "quickLoginCheckMilliSeconds":  1000,
+    "maxDeltaTimeSeconds":  43200,
+    "failureFactor":  5,
+    "defaultRole":  {
+                        "id":  "0dfd1c11-5c5d-48fe-a7d1-e5ab9c555e12",
+                        "name":  "default-roles-bus-reservation",
+                        "description":  "${role_default-roles}",
+                        "composite":  true,
+                        "clientRole":  false,
+                        "containerId":  "e0c46d1b-f67e-45a7-a418-8ade8df10a87"
+                    },
+    "requiredCredentials":  [
+                                "password"
+                            ],
+    "otpPolicyType":  "totp",
+    "otpPolicyAlgorithm":  "HmacSHA1",
+    "otpPolicyInitialCounter":  0,
+    "otpPolicyDigits":  6,
+    "otpPolicyLookAheadWindow":  1,
+    "otpPolicyPeriod":  30,
+    "otpPolicyCodeReusable":  false,
+    "otpSupportedApplications":  [
+                                     "totpAppFreeOTPName",
+                                     "totpAppGoogleName",
+                                     "totpAppMicrosoftAuthenticatorName"
+                                 ],
+    "webAuthnPolicyRpEntityName":  "keycloak",
+    "webAuthnPolicySignatureAlgorithms":  [
+                                              "ES256",
+                                              "RS256"
+                                          ],
+    "webAuthnPolicyRpId":  "",
+    "webAuthnPolicyAttestationConveyancePreference":  "not specified",
+    "webAuthnPolicyAuthenticatorAttachment":  "not specified",
+    "webAuthnPolicyRequireResidentKey":  "not specified",
+    "webAuthnPolicyUserVerificationRequirement":  "not specified",
+    "webAuthnPolicyCreateTimeout":  0,
+    "webAuthnPolicyAvoidSameAuthenticatorRegister":  false,
+    "webAuthnPolicyAcceptableAaguids":  [
+
+                                        ],
+    "webAuthnPolicyExtraOrigins":  [
+
+                                   ],
+    "webAuthnPolicyPasswordlessRpEntityName":  "keycloak",
+    "webAuthnPolicyPasswordlessSignatureAlgorithms":  [
+                                                          "ES256",
+                                                          "RS256"
+                                                      ],
+    "webAuthnPolicyPasswordlessRpId":  "",
+    "webAuthnPolicyPasswordlessAttestationConveyancePreference":  "not specified",
+    "webAuthnPolicyPasswordlessAuthenticatorAttachment":  "not specified",
+    "webAuthnPolicyPasswordlessRequireResidentKey":  "not specified",
+    "webAuthnPolicyPasswordlessUserVerificationRequirement":  "not specified",
+    "webAuthnPolicyPasswordlessCreateTimeout":  0,
+    "webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister":  false,
+    "webAuthnPolicyPasswordlessAcceptableAaguids":  [
+
+                                                    ],
+    "webAuthnPolicyPasswordlessExtraOrigins":  [
+
+                                               ],
+    "browserSecurityHeaders":  {
+                                   "contentSecurityPolicyReportOnly":  "",
+                                   "xContentTypeOptions":  "nosniff",
+                                   "referrerPolicy":  "no-referrer",
+                                   "xRobotsTag":  "none",
+                                   "xFrameOptions":  "SAMEORIGIN",
+                                   "contentSecurityPolicy":  "frame-src \u0027self\u0027; frame-ancestors \u0027self\u0027; object-src \u0027none\u0027;",
+                                   "xXSSProtection":  "1; mode=block",
+                                   "strictTransportSecurity":  "max-age=31536000; includeSubDomains"
+                               },
+    "smtpServer":  {
+
+                   },
+    "loginTheme":  "omnibus",
+    "eventsEnabled":  false,
+    "eventsListeners":  [
+                            "jboss-logging"
+                        ],
+    "enabledEventTypes":  [
+
+                          ],
+    "adminEventsEnabled":  false,
+    "adminEventsDetailsEnabled":  false,
+    "internationalizationEnabled":  false,
+    "supportedLocales":  [
+
+                         ],
+    "browserFlow":  "browser",
+    "registrationFlow":  "registration",
+    "directGrantFlow":  "direct grant",
+    "resetCredentialsFlow":  "reset credentials",
+    "clientAuthenticationFlow":  "clients",
+    "dockerAuthenticationFlow":  "docker auth",
+    "firstBrokerLoginFlow":  "first broker login",
+    "attributes":  {
+                       "cibaBackchannelTokenDeliveryMode":  "poll",
+                       "cibaAuthRequestedUserHint":  "login_hint",
+                       "oauth2DevicePollingInterval":  "5",
+                       "clientOfflineSessionMaxLifespan":  "0",
+                       "clientSessionIdleTimeout":  "0",
+                       "clientOfflineSessionIdleTimeout":  "0",
+                       "cibaInterval":  "5",
+                       "realmReusableOtpCode":  "false",
+                       "cibaExpiresIn":  "120",
+                       "oauth2DeviceCodeLifespan":  "600",
+                       "parRequestUriLifespan":  "60",
+                       "clientSessionMaxLifespan":  "0",
+                       "organizationsEnabled":  "false"
+                   },
+    "userManagedAccessAllowed":  false,
+    "organizationsEnabled":  false,
+    "clientProfiles":  {
+                           "profiles":  [
+
+                                        ]
+                       },
+    "clientPolicies":  {
+                           "policies":  [
+
+                                        ]
+                       },
+    "users":  [
+                  {
+                      "credentials":  [
+                                          {
+                                              "value":  "admin123",
+                                              "type":  "password",
+                                              "temporary":  false
+                                          }
+                                      ],
+                      "emailVerified":  true,
+                      "username":  "admin",
+                      "firstName":  "Enterprise",
+                      "lastName":  "Admin",
+                      "email":  "admin@omnibus.local",
+                      "realmRoles":  [
+                                         "ADMIN"
+                                     ],
+                      "attributes":  {
+                                         "homepage":  [
+                                                          "/admin"
+                                                      ],
+                                         "timezone":  [
+                                                          "Asia/Kolkata"
+                                                      ],
+                                         "language":  [
+                                                          "en"
+                                                      ],
+                                         "theme":  [
+                                                       "dark"
+                                                   ]
+                                     },
+                      "enabled":  true
+                  },
+                  {
+                      "credentials":  [
+                                          {
+                                              "value":  "user123",
+                                              "type":  "password",
+                                              "temporary":  false
+                                          }
+                                      ],
+                      "emailVerified":  true,
+                      "username":  "john_doe",
+                      "firstName":  "John",
+                      "lastName":  "Doe",
+                      "email":  "user@omnibus.local",
+                      "realmRoles":  [
+                                         "USER"
+                                     ],
+                      "attributes":  {
+                                         "homepage":  [
+                                                          "/booking"
+                                                      ],
+                                         "timezone":  [
+                                                          "Asia/Kolkata"
+                                                      ],
+                                         "language":  [
+                                                          "en"
+                                                      ],
+                                         "theme":  [
+                                                       "dark"
+                                                   ]
+                                     },
+                      "enabled":  true
+                  }
+              ]
 }

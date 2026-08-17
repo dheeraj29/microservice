@@ -1,6 +1,6 @@
-# Angularplay
+# OmniBus Angular 21 Frontend Application
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 18.0.3.
+This project is built using [Angular](https://angular.dev/) 21 with Standalone Components, Reactive Signals state management, and Vite development tooling.
 
 ## Development server
 

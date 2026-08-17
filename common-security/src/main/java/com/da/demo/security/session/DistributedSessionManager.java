@@ -52,6 +52,23 @@ public class DistributedSessionManager {
         session.setUsername(keycloakAuthService.extractUsernameFromToken(accessToken));
         session.setRoles(keycloakAuthService.extractRolesFromToken(accessToken));
         session.setClientFingerprint(clientFingerprint);
+        session.setLanguage(keycloakAuthService.extractCustomClaim(accessToken, "language", "en"));
+        session.setTimezone(keycloakAuthService.extractCustomClaim(accessToken, "timezone", "Asia/Kolkata"));
+        session.setHomepage(keycloakAuthService.extractCustomClaim(accessToken, "homepage", "/booking"));
+        session.setTheme(keycloakAuthService.extractCustomClaim(accessToken, "theme", "dark"));
+
+        saveSession(session, sessionId, SESSION_TTL);
+        return session;
+    }
+
+    public SessionRecord updateUserPreferences(String sessionId, Map<String, String> prefs) {
+        SessionRecord session = loadAndExtendSession(sessionId);
+        if (session == null) return null;
+
+        if (prefs.containsKey("language")) session.setLanguage(prefs.get("language"));
+        if (prefs.containsKey("timezone")) session.setTimezone(prefs.get("timezone"));
+        if (prefs.containsKey("homepage")) session.setHomepage(prefs.get("homepage"));
+        if (prefs.containsKey("theme")) session.setTheme(prefs.get("theme"));
 
         saveSession(session, sessionId, SESSION_TTL);
         return session;

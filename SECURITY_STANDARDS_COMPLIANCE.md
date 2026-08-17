@@ -42,7 +42,7 @@ The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Archi
 * **Token Isolation**: Single Page Applications (SPA) never handle, inspect, or store raw JSON Web Tokens (JWTs), eliminating JavaScript token theft via Cross-Site Scripting (XSS).
 * **Decentralized Embedded BFF**: Microservices independently validate opaque session cookies against a shared high-performance Valkey cache, eliminating monolithic Gateway CPU bottlenecks.
 * **Cryptographic Authorization Code Exchange (PKCE)**: Mandatory RFC 7636 SHA-256 (`S256`) code challenges for both Swagger UI and BFF authentication orchestrators.
-* **Micro-Segmented M2M Mesh**: Inter-service synchronous REST communications are cryptographically signed using OAuth 2.0 Client Credentials with dedicated Keycloak service accounts.
+* **Dual-Mode Microservice Mesh**: Inter-service OpenFeign calls automatically relay the active user's session context for interactive requests, while asynchronously falling back to cryptographically signed OAuth 2.0 Client Credentials (M2M) for `@Scheduled` background jobs and asynchronous workers.
 
 ---
 
@@ -54,6 +54,7 @@ The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Archi
 | :--- | :--- | :--- |
 | **Unauthorized Endpoint Access** | Role-Based Access Control (RBAC) enforced via `@PreAuthorize("hasRole('ADMIN')")` and `@PreAuthorize("hasRole('USER')")` at controller and method levels. | [`AdminController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/adminservice/src/main/java/com/da/demo/adminservice/controller/AdminController.java), [`BookingController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/bookingservice/src/main/java/com/da/demo/bookingservice/controller/BookingController.java) |
 | **Actuator Information Exposure** | Sensitive actuator endpoints (`/env`, `/heapdump`, `/beans`, `/configprops`) are permanently disabled. Only `/health`, `/info`, and `/prometheus` are exposed. | [`application.properties`](file:///c:/Personal-Project/microservice-main/microservice-main/adminservice/src/main/resources/application.properties) (`management.endpoints.web.exposure.include=health,info,prometheus`) |
+| **User Attribute Privilege Escalation** | Profile & preference updates (`language`, `theme`, etc.) use the **User's Active Bearer Token** via Keycloak's Account API (`/realms/{realm}/account`). Eliminates broad admin tokens (`manage-users`), guaranteeing users can only modify their own attributes. | [`KeycloakAuthService.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/service/KeycloakAuthService.java), [`BffAuthController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/controller/BffAuthController.java) |
 | **Direct Token Endpoint Exposure** | Kubernetes Gateway API (`HTTPRoute`) isolates Keycloak's token minting endpoint (`/protocol/openid-connect/token`) to internal ClusterIP. Only public interactive UI endpoints (`/auth`, `/logout`, `/broker/`) are routeable from the edge. | [`envoy/httproute.yaml`](file:///c:/Personal-Project/microservice-main/microservice-main/envoy/httproute.yaml) |
 
 ---
@@ -94,6 +95,7 @@ The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Archi
 | :--- | :--- | :--- |
 | **Wildcard CORS (`Access-Control-Allow-Origin: *`)** | Removed all ad-hoc `@CrossOrigin` annotations. CORS is centrally managed at the Gateway edge with strict explicit origins (`http://localhost:4200`) and `allowCredentials: true`. | [`gateway/src/main/resources/application.yml`](file:///c:/Personal-Project/microservice-main/microservice-main/gateway/src/main/resources/application.yml) |
 | **Default Password / Credential Stuffing** | Direct Access Grants (ROPC) permanently disabled in Keycloak realm definition (`directAccessGrantsEnabled: false`). Keycloak rejects username/password HTTP POST token grants. | [`keycloak/realm-export.json`](file:///c:/Personal-Project/microservice-main/microservice-main/keycloak/realm-export.json) |
+| **Excessive Scope / PII Exposure Attack Surface** | Purged non-essential client scopes (`phone`, `address`, `acr`, `organization`, `microprofile-jwt`), leaving only strictly essential scopes (`openid`, `profile`, `email`, `roles`, `web-origins`). | [`keycloak/realm-export.json`](file:///c:/Personal-Project/microservice-main/microservice-main/keycloak/realm-export.json) |
 | **Stack Trace Leakage** | Standardized RFC 7807 Problem Details via centralized `GlobalExceptionHandler`. Internal exception stack traces are suppressed from client responses. | [`GlobalExceptionHandler.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/exception/GlobalExceptionHandler.java) |
 
 ---
@@ -260,7 +262,9 @@ Under distributed denial-of-service (DDoS) or high-concurrency bot attacks, cach
 
 ### 🧮 Tier 2: Keycloak Server-Side CAPTCHA Authenticator SPI (`keycloak-captcha-spi`)
 * **100% Server Enforced**: The custom `ValkeyCaptchaAuthenticator` SPI runs directly inside Keycloak's server-side authentication pipeline. API/curl direct POST attempts cannot bypass verification.
-* **Ephemeral Cryptographic HMAC**: Challenges are signed with 120s time-bounded HMAC-SHA256 signatures, ensuring zero server memory leaks.
+* **Valkey Cluster Secret Sync**: The cluster HMAC signing key is synchronized across all Keycloak pods via Valkey (`keycloak:captcha:cluster_secret`) or external environment variable (`KEYCLOAK_CAPTCHA_SECRET`), ensuring cross-instance compatibility.
+* **Distributed Single-Use Replay Protection**: Token signatures are atomically recorded in Valkey upon submission (`SET captcha:used:<sig> 1 EX 120 NX`), preventing attackers from replaying a captured CAPTCHA token across different Keycloak nodes.
+* **Ephemeral Cryptographic HMAC**: Challenges are signed with 120s time-bounded HMAC-SHA256 signatures with resilient fallback if Valkey is temporarily offline.
 * **OmniBus Custom Theme**: High-DPI vector SVG challenge with 1-click refresh 🔄 and quick-fill demo credentials.
 
 ### 🔒 Tier 3: Keycloak Native Brute Force Detection & Account Lockout
