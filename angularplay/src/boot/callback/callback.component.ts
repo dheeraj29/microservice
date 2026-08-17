@@ -40,6 +40,7 @@ export class CallbackComponent implements OnInit {
   ngOnInit() {
     this.route.queryParamMap.subscribe(params => {
       const code = params.get('code');
+      const state = params.get('state');
       const error = params.get('error') || params.get('error_description');
 
       if (error) {
@@ -52,8 +53,12 @@ export class CallbackComponent implements OnInit {
         return;
       }
 
-      // Exchange code via BFF Gateway
-      this.http.get<any>(`/auth/callback?code=${encodeURIComponent(code)}`, { withCredentials: true }).subscribe({
+      // Exchange code via BFF Gateway with PKCE state verification
+      let callbackUrl = `/auth/callback?code=${encodeURIComponent(code)}`;
+      if (state) {
+        callbackUrl += `&state=${encodeURIComponent(state)}`;
+      }
+      this.http.get<any>(callbackUrl, { withCredentials: true }).subscribe({
         next: (res) => {
           if (res && res.authenticated) {
             this.userService.currentUser.set({
@@ -63,7 +68,9 @@ export class CallbackComponent implements OnInit {
               roles: res.roles || []
             });
 
-            if (res.isAdmin) {
+            if (res.targetUrl) {
+              this.router.navigateByUrl(res.targetUrl);
+            } else if (res.isAdmin) {
               this.router.navigate(['/admin']);
             } else {
               this.router.navigate(['/booking']);

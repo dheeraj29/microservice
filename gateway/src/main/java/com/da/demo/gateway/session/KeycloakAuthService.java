@@ -45,6 +45,10 @@ public class KeycloakAuthService {
     }
 
     public Mono<Map<String, Object>> exchangeAuthorizationCode(String code, String redirectUri) {
+        return exchangeAuthorizationCode(code, redirectUri, null);
+    }
+
+    public Mono<Map<String, Object>> exchangeAuthorizationCode(String code, String redirectUri, String codeVerifier) {
         String tokenUrl = String.format("%s/realms/%s/protocol/openid-connect/token", keycloakUrl, realm);
 
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
@@ -52,6 +56,9 @@ public class KeycloakAuthService {
         formData.add("client_id", clientId);
         formData.add("code", code);
         formData.add("redirect_uri", redirectUri);
+        if (codeVerifier != null && !codeVerifier.isBlank()) {
+            formData.add("code_verifier", codeVerifier);
+        }
         if (clientSecret != null && !clientSecret.isBlank()) {
             formData.add("client_secret", clientSecret);
         }

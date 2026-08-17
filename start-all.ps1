@@ -71,11 +71,11 @@ $regPath = Join-Path $BaseDir "service-registry"
 Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d `"$regPath`" && `"$MvnCmd`" spring-boot:run" -WindowStyle Minimized
 $null = Wait-ForService "Service Registry (Eureka)" "http://localhost:8761" 35
 
-# 4. Start Cloud Gateway & BFF Security Service (Port 8080)
-Write-Host "`n[4/6] Starting Cloud Gateway & BFF Security Service (Port 8080)..." -ForegroundColor Green
+# 4. Start API Gateway & Auth Orchestrator (Port 8080)
+Write-Host "`n[4/6] Starting API Gateway & Auth Orchestrator (Port 8080)..." -ForegroundColor Green
 $gwPath = Join-Path $BaseDir "gateway"
 Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d `"$gwPath`" && `"$MvnCmd`" spring-boot:run" -WindowStyle Minimized
-$null = Wait-ForService "Gateway & BFF Security" "http://localhost:8080/actuator/health" 35
+$null = Wait-ForService "API Gateway" "http://localhost:8080/actuator/health" 35
 
 # 5. Start Backend Microservices
 Write-Host "`n[5/6] Starting Core Microservices..." -ForegroundColor Green
@@ -98,20 +98,21 @@ $null = Wait-ForService "Booking Service" "http://localhost:8083/bookingservice/
 # 5.4 Payment Service (Port 8085)
 $payPath = Join-Path $BaseDir "paymentservice"
 Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d `"$payPath`" && `"$MvnCmd`" spring-boot:run" -WindowStyle Minimized
+$null = Wait-ForService "Payment Service" "http://localhost:8085/paymentservice/v1/orders/1" 35
 
-# 6. Start Frontend UI
-Write-Host "`n[6/6] Launching Modern Angular 22 Frontend (Port 4200)..." -ForegroundColor Green
-$angularPath = Join-Path $BaseDir "angularplay"
-Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d `"$angularPath`" && npm start"
-$null = Wait-ForService "Angular 22 Web UI" "http://localhost:4200" 30
+# 6. Start Angular Frontend (Port 4200)
+Write-Host "`n[6/6] Launching Modern Angular 21 Frontend (Port 4200)..." -ForegroundColor Green
+$angPath = Join-Path $BaseDir "angularplay"
+Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d `"$angPath`" && npm start"
 
 # Open Browser
+Start-Sleep -Seconds 3
 Start-Process "http://localhost:4200"
 
 Write-Host "`n=======================================================================" -ForegroundColor Cyan
-Write-Host "  OmniBus Full Enterprise Stack is Running & Verified!" -ForegroundColor Yellow
-Write-Host "  - Frontend UI:        http://localhost:4200" -ForegroundColor White
-Write-Host "  - API Gateway / BFF:  http://localhost:8080" -ForegroundColor White
+Write-Host " OmniBus Full Enterprise Stack is Running!" -ForegroundColor Yellow
+Write-Host " - Frontend UI:        http://localhost:4200" -ForegroundColor White
+Write-Host " - API Gateway:        http://localhost:8080" -ForegroundColor White
 Write-Host "  - Eureka Dashboard:   http://localhost:8761" -ForegroundColor White
 Write-Host "  - RabbitMQ Console:   http://localhost:15672 (guest / guest)" -ForegroundColor White
 Write-Host "  - Keycloak Admin:     http://localhost:8088/admin (admin / admin)" -ForegroundColor White

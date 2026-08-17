@@ -1,12 +1,12 @@
 # 🚌 OmniBus — Enterprise Cloud-Native Transport Platform
 
-[![Java](https://img.shields.io/badge/Java-17%20LTS-orange.svg?logo=openjdk)](https://openjdk.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.x%20%2F%204.x-brightgreen.svg?logo=springboot)](https://spring.io/projects/spring-boot)
+[![Java](https://img.shields.io/badge/Java-21%20LTS-orange.svg?logo=openjdk)](https://openjdk.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-brightgreen.svg?logo=springboot)](https://spring.io/projects/spring-boot)
 [![Spring Cloud Gateway](https://img.shields.io/badge/Spring%20Cloud%20Gateway-BFF%20Reactive-green.svg)](https://spring.io/projects/spring-cloud-gateway)
 [![Keycloak](https://img.shields.io/badge/Keycloak-26.0.7%20IAM-blue.svg?logo=keycloak)](https://www.keycloak.org/)
 [![Valkey](https://img.shields.io/badge/Valkey-8.0%20Distributed%20Lock-red.svg)](https://valkey.io/)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.x%20AMQP%20Saga-orange.svg?logo=rabbitmq)](https://www.rabbitmq.com/)
-[![Angular](https://img.shields.io/badge/Angular-22%20Signals-dd0031.svg?logo=angular)](https://angular.dev/)
+[![Angular](https://img.shields.io/badge/Angular-21%20Signals-dd0031.svg?logo=angular)](https://angular.dev/)
 
 > **OmniBus** is an enterprise-grade, cloud-native intercity bus reservation, live 2x2 cabin seat mapping, and fleet management platform engineered with modern microservices, reactive event-driven choreography, distributed concurrency locking, and zero-trust BFF (Backend-for-Frontend) security.
 
@@ -15,7 +15,7 @@
 ## 📌 Architecture Overview (Pattern 3: Decentralized Embedded BFF)
 
 ```
-                                 [ Browser / Angular 22 SPA ]
+                                 [ Browser / Angular 21 SPA ]
                                                │
                            ( Opaque HttpOnly Cookie: __Host-OmniSession )
                                                ▼
@@ -81,7 +81,7 @@ OmniBus implements the **IETF OAuth 2.0 Security Best Current Practice (BCP)** u
 | **`keycloak`** | `8088` | Keycloak 26.0.7 IAM | OpenID Connect Identity Provider, RBAC roles (`ADMIN`, `USER`) | [Admin Console](http://localhost:8088/admin) |
 | **`valkey`** | `6379` | Valkey 8.0 Alpine | Distributed concurrency mutex, zero-parsing session cache | — |
 | **`rabbitmq`** | `5672` / `15672` | RabbitMQ 3 Management | Asynchronous message bus, saga choreography, event queues | [Management UI](http://localhost:15672) |
-| **`angularplay`** | `4200` | Angular 22 + Signals | Responsive Single Page App, 2x2 seat picker, digital boarding passes | [Web UI](http://localhost:4200) |
+| **`angularplay`** | `4200` | Angular 21 + Signals | Responsive Single Page App, 2x2 seat picker, digital boarding passes | [Web UI](http://localhost:4200) |
 
 ---
 
@@ -90,7 +90,7 @@ OmniBus implements the **IETF OAuth 2.0 Security Best Current Practice (BCP)** u
 The project is completely self-contained with **zero global tooling requirements** (embedded Apache Maven 3.9.9 and standalone Keycloak 26.0.7 in `tools/`):
 
 ### Prerequisites
-* **Java 17+ JDK** installed and configured on `PATH`.
+* **Java 21+ JDK** installed and configured on `PATH`.
 * **Node.js 20+** installed.
 * **Podman** or **Docker** running (for RabbitMQ and Valkey container bridging).
 
@@ -119,12 +119,12 @@ stop-all.bat
 
 | Console / Application | URL | Username | Password | Role / Permissions |
 | :--- | :--- | :--- | :--- | :--- |
-| **Angular 22 Frontend** | [http://localhost:4200](http://localhost:4200) | `admin` | `admin123` | `ROLE_ADMIN` (Fleet Ops, Bookings, Analytics) |
+| **Angular 21 Frontend** | [http://localhost:4200](http://localhost:4200) | `admin` | `admin123` | `ROLE_ADMIN` (Fleet Ops, Bookings, Analytics) |
 | **Customer Booking Portal** | [http://localhost:4200/booking](http://localhost:4200/booking) | `john_doe` | `user123` | `ROLE_USER` (2x2 Seat Picker, Boarding Passes) |
 | **Keycloak Admin Console** | [http://localhost:8088/admin](http://localhost:8088/admin) | `admin` | `admin` | Master Realm & IAM Configuration |
 | **Eureka Dashboard** | [http://localhost:8761](http://localhost:8761) | — | — | Live Microservice Discovery Heartbeats |
 | **RabbitMQ Management** | [http://localhost:15672](http://localhost:15672) | `guest` | `guest` | Message Queues, Exchanges & Channels |
-| **API Gateway / BFF** | [http://localhost:8080](http://localhost:8080) | — | — | Unified Reverse Proxy Entry Point |
+| **API Gateway** | [http://localhost:8080](http://localhost:8080) | — | — | Unified Reverse Proxy Entry Point |
 
 ---
 
@@ -141,11 +141,12 @@ When migrating from local Spring Cloud Gateway to **Kubernetes Gateway API** (En
 
 ---
 
-## 📖 Complete Technical Documentation
+## 📖 Complete Technical & Security Documentation
 
-For complete architectural specifications, sequence diagrams, and concurrency deep-dives, open the interactive documentation:
+For comprehensive architectural specifications, sequence diagrams, concurrency deep-dives, and security compliance matrices:
 
-👉 **[`DEVELOPER_GUIDE.html`](DEVELOPER_GUIDE.html)** *(Open in any web browser)*
+* 📘 **[`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md)** — Complete Developer & Architecture Engineering Guide (16 Core Sections).
+* 🛡️ **[`SECURITY_STANDARDS_COMPLIANCE.md`](SECURITY_STANDARDS_COMPLIANCE.md)** — Enterprise Security Architecture & Standards Compliance Matrix (OWASP Top 10 2021, OWASP API Top 10 2023, RFC 7636 PKCE, RFC 6265bis, NIST Zero-Trust).
 
 ---
 

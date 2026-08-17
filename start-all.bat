@@ -52,7 +52,7 @@ start "OmniBus - Service Registry" /min cmd /c "cd /d "%BASE_DIR%service-registr
 timeout /t 5 >nul
 
 echo.
-echo [4/6] Starting Cloud Gateway and BFF Security Service (Port 8080)...
+echo [4/6] Starting API Gateway & Auth Orchestrator (Port 8080)...
 start "OmniBus - Gateway" /min cmd /c "cd /d "%BASE_DIR%gateway" && "%MVN_CMD%" spring-boot:run"
 timeout /t 4 >nul
 
@@ -71,7 +71,7 @@ echo Starting Payment Service (Port 8085)...
 start "OmniBus - Payment Service" /min cmd /c "cd /d "%BASE_DIR%paymentservice" && "%MVN_CMD%" spring-boot:run"
 
 echo.
-echo [6/6] Launching Modern Angular 22 Frontend (Port 4200)...
+echo [6/6] Launching Modern Angular 21 Frontend (Port 4200)...
 start "OmniBus - Angular UI" cmd /c "cd /d "%BASE_DIR%angularplay" && npm start"
 
 echo.
@@ -83,7 +83,7 @@ echo.
 echo =======================================================================
 echo  OmniBus Full Enterprise Stack is Running!
 echo  - Frontend UI:        http://localhost:4200
-echo  - API Gateway / BFF:  http://localhost:8080
+echo  - API Gateway:        http://localhost:8080
 echo  - Eureka Dashboard:   http://localhost:8761
 echo  - RabbitMQ Console:   http://localhost:15672 - guest / guest
 echo  - Keycloak Admin:     http://localhost:8088/admin - admin / admin

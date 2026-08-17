@@ -29,10 +29,24 @@ if [ -f "$BASE_DIR/tools/keycloak-26.0.7/bin/kc.sh" ]; then
     (cd "$BASE_DIR/tools/keycloak-26.0.7/bin" && ./kc.sh start-dev --http-port=8088 > "$BASE_DIR/keycloak.log" 2>&1 &)
 fi
 
-# 3. Start Spring Boot Microservices
+# 3. Start Service Registry & Gateway
 echo ""
-echo "[3/5] Starting Spring Boot Microservices..."
-services=("service-registry" "inventoryservice" "adminservice" "bookingservice" "paymentservice")
+echo "[3/5] Starting Service Registry & API Gateway..."
+infra_services=("service-registry" "gateway")
+for svc in "${infra_services[@]}"; do
+    echo "  -> Starting $svc..."
+    if [ -f "$BASE_DIR/tools/apache-maven-3.9.9/bin/mvn" ]; then
+        (cd "$BASE_DIR/$svc" && "$BASE_DIR/tools/apache-maven-3.9.9/bin/mvn" spring-boot:run > "$BASE_DIR/$svc.log" 2>&1 &)
+    else
+        (cd "$BASE_DIR/$svc" && mvn spring-boot:run > "$BASE_DIR/$svc.log" 2>&1 &)
+    fi
+    sleep 3
+done
+
+# 4. Start Spring Boot Microservices
+echo ""
+echo "[4/6] Starting Spring Boot Microservices..."
+services=("inventoryservice" "adminservice" "bookingservice" "paymentservice")
 
 for svc in "${services[@]}"; do
     echo "  -> Starting $svc..."
@@ -44,15 +58,16 @@ for svc in "${services[@]}"; do
     sleep 3
 done
 
-# 4. Start Frontend UI
+# 5. Start Frontend UI
 echo ""
-echo "[4/5] Launching Modern Angular 22 Frontend (Port 4200)..."
+echo "[5/6] Launching Modern Angular 21 Frontend (Port 4200)..."
 (cd "$BASE_DIR/angularplay" && npm start > "$BASE_DIR/angularplay.log" 2>&1 &)
 
 echo ""
 echo "======================================================================="
 echo "  OmniBus Stack is Running!"
 echo "  - Frontend UI:        http://localhost:4200"
+echo "  - API Gateway:        http://localhost:8080"
 echo "  - Eureka Dashboard:   http://localhost:8761"
 echo "  - RabbitMQ Console:   http://localhost:15672 (guest / guest)"
 echo "  - Keycloak Admin:     http://localhost:8088/admin (admin / admin)"

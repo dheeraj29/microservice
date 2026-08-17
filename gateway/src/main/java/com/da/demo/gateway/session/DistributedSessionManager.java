@@ -164,6 +164,53 @@ public class DistributedSessionManager {
         return redisTemplate.hasKey("revoked_archive:" + sessionId);
     }
 
+    public static class PkceStateRecord {
+        private String codeVerifier;
+        private String targetUrl;
+
+        public PkceStateRecord() {}
+
+        public PkceStateRecord(String codeVerifier, String targetUrl) {
+            this.codeVerifier = codeVerifier;
+            this.targetUrl = targetUrl;
+        }
+
+        public String getCodeVerifier() { return codeVerifier; }
+        public void setCodeVerifier(String codeVerifier) { this.codeVerifier = codeVerifier; }
+        public String getTargetUrl() { return targetUrl; }
+        public void setTargetUrl(String targetUrl) { this.targetUrl = targetUrl; }
+    }
+
+    public Mono<Boolean> savePkceState(String state, String codeVerifier, String targetUrl) {
+        if (state == null || codeVerifier == null) {
+            return Mono.just(false);
+        }
+        try {
+            PkceStateRecord record = new PkceStateRecord(codeVerifier, targetUrl);
+            String json = objectMapper.writeValueAsString(record);
+            return redisTemplate.opsForValue().set("pkce:state:" + state, json, Duration.ofMinutes(5));
+        } catch (Exception e) {
+            log.error("Failed to serialize PKCE state {}: {}", state, e.getMessage());
+            return Mono.just(false);
+        }
+    }
+
+    public Mono<PkceStateRecord> consumePkceState(String state) {
+        if (state == null || state.isBlank()) {
+            return Mono.empty();
+        }
+        String key = "pkce:state:" + state;
+        return redisTemplate.opsForValue().get(key)
+                .flatMap(json -> redisTemplate.delete(key).thenReturn(json))
+                .map(json -> {
+                    try {
+                        return objectMapper.readValue(json, PkceStateRecord.class);
+                    } catch (Exception e) {
+                        return new PkceStateRecord(json, null);
+                    }
+                });
+    }
+
     private Mono<Boolean> saveSession(SessionRecord session, String sessionId, Duration ttl) {
         try {
             String json = objectMapper.writeValueAsString(session);

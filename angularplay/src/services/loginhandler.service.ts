@@ -39,9 +39,14 @@ export class UserService {
     this.restoreSession().subscribe();
   }
 
-  // Redirect to BFF Gateway Login -> Keycloak OIDC (prompt=login forced)
-  loginWithKeycloak() {
-    window.location.href = `${this.bffAuthUrl}/login`;
+  // Redirect to BFF Gateway Login -> Keycloak OIDC (prompt=login forced) with target URL state
+  loginWithKeycloak(redirectPath?: string) {
+    const target = redirectPath || (window.location.pathname !== '/' && window.location.pathname !== '/callback' ? window.location.pathname + window.location.search : '');
+    if (target) {
+      window.location.href = `${this.bffAuthUrl}/login?redirect=${encodeURIComponent(target)}`;
+    } else {
+      window.location.href = `${this.bffAuthUrl}/login`;
+    }
   }
 
   // Restore authenticated session via BFF Gateway HttpOnly Cookie
@@ -94,7 +99,7 @@ export const AuthGuard: CanActivateFn = (next: ActivatedRouteSnapshot, state: Ro
       if (isAuth) {
         return true;
       }
-      userService.loginWithKeycloak();
+      userService.loginWithKeycloak(state.url);
       return false;
     })
   );
@@ -119,7 +124,7 @@ export const AdminGuard: CanActivateFn = (next: ActivatedRouteSnapshot, state: R
         router.navigate(['/booking']);
         return false;
       }
-      userService.loginWithKeycloak();
+      userService.loginWithKeycloak(state.url);
       return false;
     })
   );

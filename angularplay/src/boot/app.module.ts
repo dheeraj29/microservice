@@ -1,4 +1,4 @@
-import { NgModule } from '@angular/core';
+import { NgModule, provideExperimentalZonelessChangeDetection } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
@@ -24,6 +24,7 @@ import { loginInterceptor } from '../interceptor/login.interceptor';
     AppRoutingModule
   ],
   providers: [
+    provideExperimentalZonelessChangeDetection(),
     provideAnimationsAsync(),
     provideHttpClient(withInterceptors([loginInterceptor]))
   ],
