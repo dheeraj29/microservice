@@ -8,8 +8,14 @@ Write-Host "====================================================================
 
 $BaseDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $MvnCmd = Join-Path $BaseDir "tools\apache-maven-3.9.9\bin\mvn.cmd"
-$KcCmd = Join-Path $BaseDir "tools\keycloak-26.0.7\bin\kc.bat"
-$KcBin = Join-Path $BaseDir "tools\keycloak-26.0.7\bin"
+$KcDir = Get-ChildItem -Path "$BaseDir\tools" -Directory -Filter "keycloak*" | Select-Object -First 1
+if ($KcDir) {
+    $KcCmd = Join-Path $KcDir.FullName "bin\kc.bat"
+    $KcBin = Join-Path $KcDir.FullName "bin"
+} else {
+    $KcCmd = "kc.bat"
+    $KcBin = ""
+}
 
 # Health Check Helper Function
 function Wait-ForService ($name, $url, $timeoutSeconds = 45) {
@@ -43,13 +49,13 @@ if ($hasPodman) {
     podman machine start 2>$null
     podman run -d --name bus-rabbitmq --network host docker.io/library/rabbitmq:3-management-alpine 2>$null
     podman start bus-rabbitmq 2>$null
-    podman run -d --name bus-valkey --network host docker.io/valkey/valkey:8.0-alpine 2>$null
+    podman run -d --name bus-valkey --network host docker.io/valkey/valkey:9.1.1-alpine 2>$null
     podman start bus-valkey 2>$null
     $null = Wait-ForService "RabbitMQ Management" "http://localhost:15672" 25
 } elseif ($hasDocker) {
     docker run -d --name bus-rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management-alpine 2>$null
     docker start bus-rabbitmq 2>$null
-    docker run -d --name bus-valkey -p 6379:6379 valkey/valkey:8.0-alpine 2>$null
+    docker run -d --name bus-valkey -p 6379:6379 valkey/valkey:9.1.1-alpine 2>$null
     docker start bus-valkey 2>$null
     $null = Wait-ForService "RabbitMQ Management" "http://localhost:15672" 25
 } else {
@@ -59,7 +65,16 @@ if ($hasPodman) {
 # 2. Start Keycloak
 Write-Host "`n[2/6] Starting Keycloak 26+ IAM Server (Port 8088)..." -ForegroundColor Green
 if (Test-Path $KcCmd) {
-    Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d `"$KcBin`" && kc.bat start-dev --http-port=8088 --import-realm" -WindowStyle Minimized
+    $KcDataImport = Join-Path $KcDir.FullName "data\import"
+    if (!(Test-Path $KcDataImport)) { New-Item -ItemType Directory -Path $KcDataImport -Force | Out-Null }
+    Copy-Item (Join-Path $BaseDir "keycloak\realm-export.json") (Join-Path $KcDataImport "realm-export.json") -Force
+    if (Test-Path (Join-Path $BaseDir "keycloak\themes\omnibus")) {
+        Copy-Item (Join-Path $BaseDir "keycloak\themes\omnibus") (Join-Path $KcDir.FullName "themes\omnibus") -Recurse -Force
+    }
+    if (Test-Path (Join-Path $BaseDir "keycloak-captcha-spi\target\keycloak-captcha-spi-1.0.0.jar")) {
+        Copy-Item (Join-Path $BaseDir "keycloak-captcha-spi\target\keycloak-captcha-spi-1.0.0.jar") (Join-Path $KcDir.FullName "providers\") -Force
+    }
+    Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d `"$KcBin`" && set KC_BOOTSTRAP_ADMIN_USERNAME=admin && set KC_BOOTSTRAP_ADMIN_PASSWORD=admin && set KEYCLOAK_ADMIN=admin && set KEYCLOAK_ADMIN_PASSWORD=admin && kc.bat start-dev --http-port=8088 --bootstrap-admin-username=admin --bootstrap-admin-password=admin --import-realm" -WindowStyle Minimized
     $null = Wait-ForService "Keycloak IAM" "http://localhost:8088/realms/bus-reservation" 40
 } else {
     Write-Host "Keycloak not found in tools directory." -ForegroundColor Red

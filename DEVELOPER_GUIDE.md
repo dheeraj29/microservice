@@ -3,7 +3,7 @@
 
 > **Version**: 2.0.0 (Production-Grade Zero-Trust Architecture)  
 > **Target Audience**: Backend Engineers, Frontend Engineers, Cloud & DevOps Architects  
-> **Technologies**: Java 21 LTS, Spring Boot 3.5.16, Spring Cloud 2025.0.3, Keycloak 26+, Valkey 8+ (Redis OSS), RabbitMQ, Netflix Eureka, Angular 21 (Signals & Standalone), Kubernetes Gateway API / Envoy.  
+> **Technologies**: Java 21 LTS, Spring Boot 3.5.16, Spring Cloud 2025.0.3, Keycloak 26+, Valkey 9+ (9.1.1 Redis OSS), RabbitMQ, Netflix Eureka, Angular 21 (Signals & Standalone), Kubernetes Gateway API / Envoy.  
 > **Security Standards Whitepaper**: 🛡️ [`SECURITY_STANDARDS_COMPLIANCE.md`](SECURITY_STANDARDS_COMPLIANCE.md) (OWASP Top 10 2021, OWASP API Top 10 2023, RFC 7636 PKCE, NIST SP 800-63B).
 
 ---
@@ -48,7 +48,7 @@ flowchart TB
 
     subgraph Identity & Cache Tier
         KC["Keycloak 26+ IAM (Port 8088)<br/>OAuth 2.1 • OIDC • Azure Entra ID Broker"]
-        VK[("Valkey 8+ Distributed Cache (Port 6379)<br/>Distributed Sessions • M2M Token Cache")]
+        VK[("Valkey 9+ (9.1.1) Distributed Cache (Port 6379)<br/>Distributed Sessions • M2M Token Cache")]
         EUK["Netflix Eureka Discovery (Port 8761)<br/>Dynamic Service Registry (5s Fetch Interval)"]
     end
 

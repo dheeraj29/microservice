@@ -1,21 +1,21 @@
 <#macro registrationLayout bodyClass="" displayInfo=false displayMessage=true displayRequiredFields=false>
 <!DOCTYPE html>
-<html lang="${locale.currentLanguageTag!'en'}">
+<html lang="${(locale.currentLanguageTag)!'en'}">
 <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <meta name="robots" content="noindex, nofollow">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>OmniBus — Secure Authentication</title>
-    <link rel="icon" href="${url.resourcesPath}/img/favicon.ico" />
-    <#if properties.styles?has_content>
+    <link rel="icon" href="${(url.resourcesPath)!''}/img/favicon.ico" />
+    <#if properties?? && properties.styles?? && properties.styles?has_content>
         <#list properties.styles?split(' ') as style>
-            <link href="${url.resourcesPath}/${style}" rel="stylesheet" />
+            <link href="${(url.resourcesPath)!''}/${style}" rel="stylesheet" />
         </#list>
     </#if>
-    <#if properties.scripts?has_content>
+    <#if properties?? && properties.scripts?? && properties.scripts?has_content>
         <#list properties.scripts?split(' ') as script>
-            <script src="${url.resourcesPath}/${script}" type="text/javascript"></script>
+            <script src="${(url.resourcesPath)!''}/${script}" type="text/javascript"></script>
         </#list>
     </#if>
 </head>
@@ -28,9 +28,9 @@
             <p class="brand-subtitle">Zero-Trust Enterprise Authentication</p>
         </div>
 
-        <#if displayMessage && message?has_content && (message.type != 'warning' || !isAppInitiatedAction??)>
-            <div class="alert-banner <#if message.type = 'error'>alert-error<#else>alert-success</#if>">
-                <span>${kcSanitize(message.summary)?no_esc}</span>
+        <#if displayMessage && message?? && message.summary?? && ((message.type)!'') != 'warning'>
+            <div class="alert-banner <#if ((message.type)!'') == 'error'>alert-error<#else>alert-success</#if>">
+                <span>${(kcSanitize(message.summary))?no_esc}</span>
             </div>
         </#if>
 

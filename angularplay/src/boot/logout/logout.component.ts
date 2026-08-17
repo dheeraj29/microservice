@@ -1,6 +1,5 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { UserService } from '../../services/loginhandler.service';
 
 /**
  * Modern Zero-Trust Logout & Audit Confirmation Page.

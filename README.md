@@ -3,8 +3,8 @@
 [![Java](https://img.shields.io/badge/Java-21%20LTS-orange.svg?logo=openjdk)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-brightgreen.svg?logo=springboot)](https://spring.io/projects/spring-boot)
 [![Spring Cloud Gateway](https://img.shields.io/badge/Spring%20Cloud%20Gateway-BFF%20Reactive-green.svg)](https://spring.io/projects/spring-cloud-gateway)
-[![Keycloak](https://img.shields.io/badge/Keycloak-26.0.7%20IAM-blue.svg?logo=keycloak)](https://www.keycloak.org/)
-[![Valkey](https://img.shields.io/badge/Valkey-8.0%20Distributed%20Lock-red.svg)](https://valkey.io/)
+[![Keycloak](https://img.shields.io/badge/Keycloak-26.7.1%20IAM-blue.svg?logo=keycloak)](https://www.keycloak.org/)
+[![Valkey](https://img.shields.io/badge/Valkey-9.1.1%20Distributed%20Lock-red.svg)](https://valkey.io/)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.x%20AMQP%20Saga-orange.svg?logo=rabbitmq)](https://www.rabbitmq.com/)
 [![Angular](https://img.shields.io/badge/Angular-21%20Signals-dd0031.svg?logo=angular)](https://angular.dev/)
 
@@ -43,7 +43,7 @@
                 └──────────────────────────────┼──────────────────────────────┘
                                                │ (Shared Session Resolution & Mutex)
                                                ▼
-                                   [ Valkey 8+ Cluster :6379 ]
+                                    [ Valkey 9+ Cluster :6379 ]
                                    ( SET NX PX 5000 Locking & Cache )
                                                │ (On Token Expiry / Refresh)
                                                ▼
@@ -84,8 +84,8 @@ OmniBus implements the **IETF OAuth 2.0 Security Best Current Practice (BCP)** u
 | **`inventoryservice`** | `8084` | Spring Boot 3.5.16 + Java 21 | Interactive 2x2 seat cabin layout, real-time seat lock, availability | [Swagger UI](http://localhost:8084/swagger-ui/index.html) |
 | **`paymentservice`** | `8085` | Spring Boot 3.5.16 + Java 21 | Distributed saga payment processing, asynchronous event listener | [Swagger UI](http://localhost:8085/swagger-ui/index.html) |
 | **`service-registry`** | `8761` | Netflix Eureka | Dynamic microservice discovery and heartbeat health monitoring | [Dashboard](http://localhost:8761) |
-| **`keycloak`** | `8088` | Keycloak 26.0.7 IAM | OpenID Connect Identity Provider, RBAC roles (`ADMIN`, `USER`) | [Admin Console](http://localhost:8088/admin) |
-| **`valkey`** | `6379` | Valkey 8.0 Alpine | Distributed concurrency mutex, zero-parsing session cache | — |
+| **`keycloak`** | `8088` | Keycloak 26.7.1 IAM | OpenID Connect Identity Provider, RBAC roles (`ADMIN`, `USER`) | [Admin Console](http://localhost:8088/admin) |
+| **`valkey`** | `6379` | Valkey 9.1.1 Alpine | Distributed concurrency mutex, zero-parsing session cache | — |
 | **`rabbitmq`** | `5672` / `15672` | RabbitMQ 3 Management | Asynchronous message bus, saga choreography, event queues | [Management UI](http://localhost:15672) |
 | **`angularplay`** | `4200` | Angular 21 + Signals | Responsive Single Page App, 2x2 seat picker, digital boarding passes | [Web UI](http://localhost:4200) |
 
@@ -93,7 +93,7 @@ OmniBus implements the **IETF OAuth 2.0 Security Best Current Practice (BCP)** u
 
 ## ⚡ Quick Start & Runbook
 
-The project is completely self-contained with **zero global tooling requirements** (embedded Apache Maven 3.9.9 and standalone Keycloak 26.0.7 in `tools/`):
+The project is completely self-contained with **zero global tooling requirements** (embedded Apache Maven 3.9.9 and standalone Keycloak in `tools/`):
 
 ### Prerequisites
 * **Java 21+ JDK** installed and configured on `PATH`.

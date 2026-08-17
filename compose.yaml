@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # 1. Valkey In-Memory Cache (Linux Foundation Open-Source Redis Drop-In)
   valkey:
-    image: valkey/valkey:8.0-alpine
+    image: valkey/valkey:9.1.1-alpine
     container_name: bus-valkey
     restart: unless-stopped
     ports:
@@ -36,7 +36,7 @@ services:
 
   # 3. Keycloak 26+ IAM Server
   keycloak:
-    image: quay.io/keycloak/keycloak:latest
+    image: quay.io/keycloak/keycloak:26.7.1
     container_name: bus-keycloak
     restart: unless-stopped
     depends_on:

@@ -1,10 +1,10 @@
 <#import "template.ftl" as layout>
-<@layout.registrationLayout displayMessage=!messagesPerField.existsError('username','password') displayInfo=false; section>
+<@layout.registrationLayout displayMessage=!((messagesPerField?? && messagesPerField.existsError('username','password'))!false) displayInfo=false; section>
     <#if section = "form">
-        <form id="kc-form-login" onsubmit="return true;" action="${url.loginAction}" method="post">
+        <form id="kc-form-login" onsubmit="return true;" action="${(url.loginAction)!''}" method="post">
             <div class="form-group">
                 <label for="username" class="form-label">Username</label>
-                <input tabindex="1" id="username" class="form-input" name="username" value="${(login.username!'')}" type="text" autofocus autocomplete="off" placeholder="Enter username (e.g. admin or john_doe)" required />
+                <input tabindex="1" id="username" class="form-input" name="username" value="${((login.username)!'')}" type="text" autofocus autocomplete="off" placeholder="Enter username (e.g. admin or john_doe)" required />
             </div>
 
             <div class="form-group">

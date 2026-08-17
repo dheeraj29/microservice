@@ -16,17 +16,24 @@ echo "[1/6] Starting Infrastructure Services (RabbitMQ & Valkey)..."
 if command -v podman &> /dev/null; then
     podman machine start 2>/dev/null || true
     podman run -d --name bus-rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management-alpine 2>/dev/null || true
-    podman run -d --name bus-valkey -p 6379:6379 valkey/valkey:8.0-alpine 2>/dev/null || true
+    podman run -d --name bus-valkey -p 6379:6379 valkey/valkey:9.1.1-alpine 2>/dev/null || true
 elif command -v docker &> /dev/null; then
     docker run -d --name bus-rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management-alpine 2>/dev/null || true
-    docker run -d --name bus-valkey -p 6379:6379 valkey/valkey:8.0-alpine 2>/dev/null || true
+    docker run -d --name bus-valkey -p 6379:6379 valkey/valkey:9.1.1-alpine 2>/dev/null || true
 fi
 
 # 2. Start Keycloak 26+
 echo ""
 echo "[2/6] Starting Keycloak 26+ IAM Server (Port 8088)..."
-if [ -f "$BASE_DIR/tools/keycloak-26.0.7/bin/kc.sh" ]; then
-    (cd "$BASE_DIR/tools/keycloak-26.0.7/bin" && ./kc.sh start-dev --http-port=8088 --import-realm > "$BASE_DIR/keycloak.log" 2>&1 &)
+KC_DIR=$(find "$BASE_DIR/tools" -maxdepth 1 -type d -name "keycloak*" 2>/dev/null | head -n 1)
+if [ -n "$KC_DIR" ] && [ -f "$KC_DIR/bin/kc.sh" ]; then
+    mkdir -p "$KC_DIR/data/import"
+    mkdir -p "$KC_DIR/providers"
+    mkdir -p "$KC_DIR/themes"
+    cp -f "$BASE_DIR/keycloak/realm-export.json" "$KC_DIR/data/import/realm-export.json"
+    [ -d "$BASE_DIR/keycloak/themes/omnibus" ] && cp -rf "$BASE_DIR/keycloak/themes/omnibus" "$KC_DIR/themes/"
+    [ -f "$BASE_DIR/keycloak-captcha-spi/target/keycloak-captcha-spi-1.0.0.jar" ] && cp -f "$BASE_DIR/keycloak-captcha-spi/target/keycloak-captcha-spi-1.0.0.jar" "$KC_DIR/providers/"
+    (cd "$KC_DIR/bin" && KC_BOOTSTRAP_ADMIN_USERNAME=admin KC_BOOTSTRAP_ADMIN_PASSWORD=admin KEYCLOAK_ADMIN=admin KEYCLOAK_ADMIN_PASSWORD=admin ./kc.sh start-dev --http-port=8088 --bootstrap-admin-username=admin --bootstrap-admin-password=admin --import-realm > "$BASE_DIR/keycloak.log" 2>&1 &)
 fi
 
 # 3. Start Service Registry & Gateway

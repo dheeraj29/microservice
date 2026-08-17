@@ -65,11 +65,17 @@ export class CallbackComponent implements OnInit {
               username: res.username,
               fullName: res.username,
               email: '',
-              roles: res.roles || []
+              roles: res.roles || [],
+              language: res.language || 'en',
+              timezone: res.timezone || 'Asia/Kolkata',
+              homepage: res.homepage || (res.isAdmin ? '/admin' : '/booking'),
+              theme: res.theme || 'dark'
             });
 
-            if (res.targetUrl && res.targetUrl !== '/logout' && res.targetUrl !== '/login' && res.targetUrl !== '/callback') {
+            if (res.targetUrl && res.targetUrl !== '/logout' && res.targetUrl !== '/login' && res.targetUrl !== '/callback' && res.targetUrl !== '/' && res.targetUrl !== '/select' && (!res.isAdmin || res.targetUrl.startsWith('/admin'))) {
               this.router.navigateByUrl(res.targetUrl);
+            } else if (res.homepage && res.homepage !== '/') {
+              this.router.navigateByUrl(res.homepage);
             } else if (res.isAdmin) {
               this.router.navigate(['/admin']);
             } else {

@@ -7,7 +7,7 @@ valkey:
   enabled: true
   image:
     repository: valkey/valkey
-    tag: 8.0-alpine
+    tag: 9.1.1-alpine
     pullPolicy: IfNotPresent
   service:
     port: 6379
@@ -24,7 +24,7 @@ keycloak:
   enabled: true
   image:
     repository: quay.io/keycloak/keycloak
-    tag: latest
+    tag: 26.7.1
     pullPolicy: IfNotPresent
   adminUser: admin
   adminPassword: adminPassword123

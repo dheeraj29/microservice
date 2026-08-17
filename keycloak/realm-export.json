@@ -166,7 +166,246 @@
 
                                         ]
                        },
-    "users":  [
+    "roles": {
+      "realm": [
+        { "name": "ADMIN", "description": "Platform Administrator" },
+        { "name": "USER", "description": "Standard Bus Reservation User" }
+      ]
+    },
+    "clients": [
+      {
+        "clientId": "angular-client",
+        "name": "Angular Play UI",
+        "enabled": true,
+        "publicClient": true,
+        "standardFlowEnabled": true,
+        "implicitFlowEnabled": false,
+        "directAccessGrantsEnabled": false,
+        "rootUrl": "http://localhost:4200",
+        "baseUrl": "/",
+        "redirectUris": [
+          "http://localhost:4200/*",
+          "http://localhost:8080/*",
+          "http://localhost:8081/*",
+          "http://localhost:8082/*",
+          "http://localhost:8083/*",
+          "http://localhost:8084/*"
+        ],
+        "webOrigins": [
+          "http://localhost:4200",
+          "http://localhost:8080",
+          "http://localhost:8081",
+          "http://localhost:8082",
+          "http://localhost:8083",
+          "http://localhost:8084"
+        ],
+        "attributes": {
+          "pkce.code.challenge.method": "S256",
+          "post.logout.redirect.uris": "http://localhost:4200/*##http://localhost:8080/*"
+        },
+        "protocolMappers": [
+          {
+            "name": "realm-roles-mapper",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-realm-role-mapper",
+            "consentRequired": false,
+            "config": {
+              "access.token.claim": "true",
+              "id.token.claim": "true",
+              "userinfo.token.claim": "true",
+              "claim.name": "realm_access.roles",
+              "jsonType.label": "String",
+              "multivalued": "true"
+            }
+          },
+          {
+            "name": "username-mapper",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-property-mapper",
+            "consentRequired": false,
+            "config": {
+              "userinfo.token.claim": "true",
+              "user.attribute": "username",
+              "id.token.claim": "true",
+              "access.token.claim": "true",
+              "claim.name": "preferred_username",
+              "jsonType.label": "String"
+            }
+          },
+          {
+            "name": "language-mapper",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "consentRequired": false,
+            "config": {
+              "userinfo.token.claim": "true",
+              "user.attribute": "language",
+              "id.token.claim": "true",
+              "access.token.claim": "true",
+              "claim.name": "language",
+              "jsonType.label": "String"
+            }
+          },
+          {
+            "name": "timezone-mapper",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "consentRequired": false,
+            "config": {
+              "userinfo.token.claim": "true",
+              "user.attribute": "timezone",
+              "id.token.claim": "true",
+              "access.token.claim": "true",
+              "claim.name": "timezone",
+              "jsonType.label": "String"
+            }
+          },
+          {
+            "name": "homepage-mapper",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "consentRequired": false,
+            "config": {
+              "userinfo.token.claim": "true",
+              "user.attribute": "homepage",
+              "id.token.claim": "true",
+              "access.token.claim": "true",
+              "claim.name": "homepage",
+              "jsonType.label": "String"
+            }
+          },
+          {
+            "name": "theme-mapper",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "consentRequired": false,
+            "config": {
+              "userinfo.token.claim": "true",
+              "user.attribute": "theme",
+              "id.token.claim": "true",
+              "access.token.claim": "true",
+              "claim.name": "theme",
+              "jsonType.label": "String"
+            }
+          }
+        ],
+        "defaultClientScopes": [
+          "web-origins",
+          "roles",
+          "profile",
+          "email"
+        ],
+        "optionalClientScopes": []
+      },
+      {
+        "clientId": "internal-backend-client",
+        "name": "OmniBus Internal Microservice Mesh",
+        "enabled": true,
+        "publicClient": false,
+        "clientAuthenticatorType": "client-secret",
+        "secret": "internal-service-mesh-secret-key-123",
+        "serviceAccountsEnabled": true,
+        "standardFlowEnabled": false,
+        "directAccessGrantsEnabled": false,
+        "redirectUris": [],
+        "defaultClientScopes": [
+          "web-origins",
+          "roles",
+          "profile",
+          "email"
+        ],
+        "optionalClientScopes": []
+      }
+    ],
+    "clientScopes": [
+      {
+        "name": "openid",
+        "protocol": "openid-connect"
+      },
+      {
+        "name": "profile",
+        "protocol": "openid-connect",
+        "protocolMappers": [
+          {
+            "name": "username",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-property-mapper",
+            "consentRequired": false,
+            "config": {
+              "userinfo.token.claim": "true",
+              "user.attribute": "username",
+              "id.token.claim": "true",
+              "access.token.claim": "true",
+              "claim.name": "preferred_username",
+              "jsonType.label": "String"
+            }
+          },
+          {
+            "name": "full name",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-full-name-mapper",
+            "consentRequired": false,
+            "config": {
+              "id.token.claim": "true",
+              "access.token.claim": "true",
+              "userinfo.token.claim": "true"
+            }
+          }
+        ]
+      },
+      {
+        "name": "email",
+        "protocol": "openid-connect",
+        "protocolMappers": [
+          {
+            "name": "email",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "consentRequired": false,
+            "config": {
+              "userinfo.token.claim": "true",
+              "user.attribute": "email",
+              "id.token.claim": "true",
+              "access.token.claim": "true",
+              "claim.name": "email",
+              "jsonType.label": "String"
+            }
+          }
+        ]
+      },
+      {
+        "name": "roles",
+        "protocol": "openid-connect",
+        "protocolMappers": [
+          {
+            "name": "realm roles",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-realm-role-mapper",
+            "consentRequired": false,
+            "config": {
+              "access.token.claim": "true",
+              "id.token.claim": "true",
+              "userinfo.token.claim": "true",
+              "claim.name": "realm_access.roles",
+              "jsonType.label": "String",
+              "multivalued": "true"
+            }
+          }
+        ]
+      },
+      {
+        "name": "web-origins",
+        "protocol": "openid-connect"
+      }
+    ],
+    "defaultDefaultClientScopes": [
+      "roles",
+      "profile",
+      "email",
+      "web-origins"
+    ],
+    "defaultOptionalClientScopes": [],
+    "users": [
                   {
                       "credentials":  [
                                           {

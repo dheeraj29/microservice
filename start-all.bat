@@ -7,7 +7,8 @@ echo.
 
 set "BASE_DIR=%~dp0"
 set "MVN_CMD=%BASE_DIR%tools\apache-maven-3.9.9\bin\mvn.cmd"
-set "KC_BIN=%BASE_DIR%tools\keycloak-26.0.7\bin"
+set "KC_BIN="
+for /d %%D in ("%BASE_DIR%tools\keycloak*") do set "KC_BIN=%%D\bin"
 
 echo [1/6] Starting Infrastructure Services (RabbitMQ and Valkey)...
 where podman >nul 2>nul
@@ -21,7 +22,7 @@ echo Podman detected. Launching RabbitMQ and Valkey containers...
 podman machine start 2>nul
 podman run -d --name bus-rabbitmq --network host docker.io/library/rabbitmq:3-management-alpine 2>nul
 podman start bus-rabbitmq 2>nul
-podman run -d --name bus-valkey --network host docker.io/valkey/valkey:8.0-alpine 2>nul
+podman run -d --name bus-valkey --network host docker.io/valkey/valkey:9.1.1-alpine 2>nul
 podman start bus-valkey 2>nul
 goto :START_KEYCLOAK
 
@@ -29,7 +30,7 @@ goto :START_KEYCLOAK
 echo Docker detected. Launching RabbitMQ and Valkey containers...
 docker run -d --name bus-rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management-alpine 2>nul
 docker start bus-rabbitmq 2>nul
-docker run -d --name bus-valkey -p 6379:6379 valkey/valkey:8.0-alpine 2>nul
+docker run -d --name bus-valkey -p 6379:6379 valkey/valkey:9.1.1-alpine 2>nul
 docker start bus-valkey 2>nul
 goto :START_KEYCLOAK
 
@@ -41,7 +42,11 @@ goto :START_KEYCLOAK
 echo.
 echo [2/6] Starting Keycloak 26+ IAM Server on port 8088...
 if exist "%KC_BIN%\kc.bat" (
-    start "OmniBus - Keycloak IAM (Port 8088)" /min cmd /c "cd /d "%KC_BIN%" && kc.bat start-dev --http-port=8088 --import-realm"
+    if not exist "%KC_BIN%\..\data\import" mkdir "%KC_BIN%\..\data\import"
+    copy /y "%BASE_DIR%keycloak\realm-export.json" "%KC_BIN%\..\data\import\realm-export.json" >nul
+    if exist "%BASE_DIR%keycloak\themes\omnibus" xcopy /s /e /y /i "%BASE_DIR%keycloak\themes\omnibus" "%KC_BIN%\..\themes\omnibus" >nul
+    if exist "%BASE_DIR%keycloak-captcha-spi\target\keycloak-captcha-spi-1.0.0.jar" copy /y "%BASE_DIR%keycloak-captcha-spi\target\keycloak-captcha-spi-1.0.0.jar" "%KC_BIN%\..\providers\" >nul
+    start "OmniBus - Keycloak IAM (Port 8088)" /min cmd /c "cd /d "%KC_BIN%" && set KC_BOOTSTRAP_ADMIN_USERNAME=admin && set KC_BOOTSTRAP_ADMIN_PASSWORD=admin && set KEYCLOAK_ADMIN=admin && set KEYCLOAK_ADMIN_PASSWORD=admin && kc.bat start-dev --http-port=8088 --bootstrap-admin-username=admin --bootstrap-admin-password=admin --import-realm"
 ) else (
     echo Keycloak directory not found in tools.
 )
