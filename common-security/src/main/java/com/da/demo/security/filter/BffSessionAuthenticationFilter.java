@@ -33,9 +33,12 @@ public class BffSessionAuthenticationFilter extends OncePerRequestFilter {
     public static final String FALLBACK_COOKIE_NAME = "OmniSession";
 
     private final DistributedSessionManager sessionManager;
+    private final com.da.demo.security.service.KeycloakAuthService keycloakAuthService;
 
-    public BffSessionAuthenticationFilter(DistributedSessionManager sessionManager) {
+    public BffSessionAuthenticationFilter(DistributedSessionManager sessionManager,
+                                         com.da.demo.security.service.KeycloakAuthService keycloakAuthService) {
         this.sessionManager = sessionManager;
+        this.keycloakAuthService = keycloakAuthService;
     }
 
     @Override
@@ -66,7 +69,16 @@ public class BffSessionAuthenticationFilter extends OncePerRequestFilter {
                     attachSessionCookie(response, effectiveSid);
                 }
 
-                // Check token expiration (< 45 seconds remaining)
+                // 2a. Periodic Keycloak bounded-staleness validation (30s window with Distributed DCL)
+                SessionRecord validatedSession = sessionManager.validateSessionWithKeycloak(session, 30);
+                if (validatedSession == null) {
+                    log.warn("Session {} for user {} rejected after Keycloak validation", sessionId, session.getUsername());
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Session expired or revoked in Keycloak");
+                    return;
+                }
+                session = validatedSession;
+
+                // 2b. Check token expiration (< 45 seconds remaining)
                 if (session.isAccessTokenExpiring(45)) {
                     log.info("Access token for user {} expiring soon. Initiating concurrency-safe rotation...", session.getUsername());
                     try {
@@ -99,8 +111,7 @@ public class BffSessionAuthenticationFilter extends OncePerRequestFilter {
                 String token = authHeader.substring(7).trim();
                 if (!token.isBlank()) {
                     try {
-                        com.nimbusds.jwt.SignedJWT signedJWT = com.nimbusds.jwt.SignedJWT.parse(token);
-                        com.nimbusds.jwt.JWTClaimsSet claims = signedJWT.getJWTClaimsSet();
+                        com.nimbusds.jwt.JWTClaimsSet claims = keycloakAuthService.verifyAndDecodeJwt(token);
                         String username = claims.getStringClaim("preferred_username");
                         if (username == null || username.isBlank()) {
                             username = claims.getSubject();
@@ -134,7 +145,7 @@ public class BffSessionAuthenticationFilter extends OncePerRequestFilter {
                         SecurityContextHolder.getContext().setAuthentication(auth);
                         request.setAttribute("X-Authenticated-User", username);
                     } catch (Exception e) {
-                        log.debug("Bearer token parse note: {}", e.getMessage());
+                        log.debug("Bearer token verification note: {}", e.getMessage());
                     }
                 }
             }

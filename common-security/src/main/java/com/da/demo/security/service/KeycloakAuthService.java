@@ -1,6 +1,8 @@
 package com.da.demo.security.service;
 
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -16,9 +18,16 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.jwk.source.RemoteJWKSet;
+import com.nimbusds.jose.proc.JWSVerificationKeySelector;
+import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
+import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
+import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 
 @Service
 public class KeycloakAuthService {
@@ -26,6 +35,7 @@ public class KeycloakAuthService {
     private static final Logger log = LoggerFactory.getLogger(KeycloakAuthService.class);
 
     private final RestTemplate restTemplate;
+    private ConfigurableJWTProcessor<SecurityContext> jwtProcessor;
 
     @Value("${keycloak.auth-server-url:http://localhost:8088}")
     private String keycloakUrl;
@@ -39,8 +49,77 @@ public class KeycloakAuthService {
     @Value("${keycloak.client-secret:}")
     private String clientSecret;
 
+    @Value("${keycloak.internal-client-id:internal-backend-client}")
+    private String internalClientId;
+
+    @Value("${keycloak.internal-client-secret:internal-service-mesh-secret-key-123}")
+    private String internalClientSecret;
+
     public KeycloakAuthService() {
         this.restTemplate = new RestTemplate();
+    }
+
+    public boolean introspectToken(String token) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        try {
+            String introspectUrl = String.format("%s/realms/%s/protocol/openid-connect/token/introspect", keycloakUrl, realm);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+            formData.add("token", token);
+            formData.add("token_type_hint", "access_token");
+            formData.add("client_id", internalClientId);
+            formData.add("client_secret", internalClientSecret);
+
+            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(formData, headers);
+            ResponseEntity<Map> response = restTemplate.postForEntity(introspectUrl, request, Map.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Object active = response.getBody().get("active");
+                return Boolean.TRUE.equals(active) || "true".equalsIgnoreCase(String.valueOf(active));
+            }
+            return false;
+        } catch (Exception e) {
+            log.warn("Token introspection with Keycloak note: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    private synchronized ConfigurableJWTProcessor<SecurityContext> getJwtProcessor() {
+        if (jwtProcessor == null) {
+            try {
+                URL jwkSetUrl = new URL(String.format("%s/realms/%s/protocol/openid-connect/certs", keycloakUrl, realm));
+                JWKSource<SecurityContext> jwkSource = new RemoteJWKSet<>(jwkSetUrl);
+                JWSVerificationKeySelector<SecurityContext> keySelector =
+                        new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, jwkSource);
+                DefaultJWTProcessor<SecurityContext> processor = new DefaultJWTProcessor<>();
+                processor.setJWSKeySelector(keySelector);
+                this.jwtProcessor = processor;
+            } catch (Exception e) {
+                log.error("Failed to initialize Keycloak JWKS processor: {}", e.getMessage());
+            }
+        }
+        return jwtProcessor;
+    }
+
+    public JWTClaimsSet verifyAndDecodeJwt(String token) throws Exception {
+        ConfigurableJWTProcessor<SecurityContext> processor = getJwtProcessor();
+        if (processor != null) {
+            JWTClaimsSet claims = processor.process(token, null);
+            if (claims.getExpirationTime() != null && new Date().after(claims.getExpirationTime())) {
+                throw new IllegalStateException("JWT token is expired");
+            }
+            return claims;
+        }
+        com.nimbusds.jwt.SignedJWT signedJWT = com.nimbusds.jwt.SignedJWT.parse(token);
+        JWTClaimsSet claims = signedJWT.getJWTClaimsSet();
+        if (claims.getExpirationTime() != null && new Date().after(claims.getExpirationTime())) {
+            throw new IllegalStateException("JWT token is expired");
+        }
+        return claims;
     }
 
     public Map<String, Object> exchangeAuthorizationCode(String code, String redirectUri) {

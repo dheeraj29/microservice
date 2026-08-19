@@ -26,8 +26,15 @@ public class SessionRecord implements Serializable {
     private String timezone = "Asia/Kolkata";
     private String homepage = "/booking";
     private String theme = "dark";
+    private Instant lastValidatedAt = Instant.now();
 
     public SessionRecord() {}
+
+    @JsonIgnore
+    public boolean isValidationStale(long maxAgeSeconds) {
+        if (lastValidatedAt == null) return true;
+        return Instant.now().isAfter(lastValidatedAt.plusSeconds(maxAgeSeconds));
+    }
 
     @JsonIgnore
     public boolean isAccessTokenExpiring(long thresholdSeconds) {
@@ -88,4 +95,7 @@ public class SessionRecord implements Serializable {
 
     public String getTheme() { return theme; }
     public void setTheme(String theme) { this.theme = theme; }
+
+    public Instant getLastValidatedAt() { return lastValidatedAt; }
+    public void setLastValidatedAt(Instant lastValidatedAt) { this.lastValidatedAt = lastValidatedAt; }
 }

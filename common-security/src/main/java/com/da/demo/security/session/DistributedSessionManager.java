@@ -163,6 +163,12 @@ public class DistributedSessionManager {
         newSession.setClientFingerprint(currentSession.getClientFingerprint());
         newSession.setRefreshSequence(currentSession.getRefreshSequence() + 1);
 
+        newSession.setLanguage(currentSession.getLanguage());
+        newSession.setTimezone(currentSession.getTimezone());
+        newSession.setHomepage(currentSession.getHomepage());
+        newSession.setTheme(currentSession.getTheme());
+        newSession.setLastValidatedAt(Instant.now());
+
         // Atomic multi-step rotation in Valkey:
         saveSession(newSession, newSid, SESSION_TTL);
         redisTemplate.opsForValue().set("pointer:" + oldSid, newSid, POINTER_TTL);
@@ -170,6 +176,99 @@ public class DistributedSessionManager {
         redisTemplate.delete("session:" + oldSid);
 
         return newSession;
+    }
+
+    /**
+     * Periodic bounded-staleness validation with Keycloak using Distributed Double-Checked Locking.
+     */
+    public SessionRecord validateSessionWithKeycloak(SessionRecord session, int maxStalenessSeconds) {
+        if (session == null || session.getSessionId() == null) {
+            return null;
+        }
+
+        // 1. Fast path: If validation is fresh (e.g. validated < 30s ago), return immediately (sub-millisecond)
+        if (!session.isValidationStale(maxStalenessSeconds)) {
+            return session;
+        }
+
+        String sid = session.getSessionId();
+        String lockKey = "lock:validate:" + sid;
+        String lockVal = UUID.randomUUID().toString();
+
+        // 2. Distributed Double-Checked Locking in Valkey
+        Boolean lockAcquired = redisTemplate.opsForValue().setIfAbsent(lockKey, lockVal, Duration.ofSeconds(4));
+
+        if (Boolean.TRUE.equals(lockAcquired)) {
+            try {
+                // Double check if another thread updated it right before lock was acquired
+                SessionRecord latest = loadAndExtendSession(sid);
+                if (latest != null && !latest.isValidationStale(maxStalenessSeconds)) {
+                    return latest;
+                }
+
+                // Call Keycloak Introspection
+                boolean active = keycloakAuthService.introspectToken(session.getAccessToken());
+
+                if (active) {
+                    session.setLastValidatedAt(Instant.now());
+                    saveSession(session, sid, SESSION_TTL);
+                    return session;
+                }
+
+                // Access token is inactive/revoked in Keycloak. Attempt silent healing with refresh token
+                log.info("Access token for user {} reported inactive by Keycloak. Attempting refresh token healing...", session.getUsername());
+                try {
+                    SessionRecord refreshedSession = refreshAndRotateSession(session);
+                    if (refreshedSession != null && !refreshedSession.getSessionId().equals(sid)) {
+                        log.info("Session auto-healed via refresh token for {}", session.getUsername());
+                        refreshedSession.setLastValidatedAt(Instant.now());
+                        saveSession(refreshedSession, refreshedSession.getSessionId(), SESSION_TTL);
+                        return refreshedSession;
+                    }
+                } catch (Exception e) {
+                    log.warn("Silent refresh failed for {}: {}", session.getUsername(), e.getMessage());
+                }
+
+                // Refresh also failed -> Session was truly revoked by admin / logout in Keycloak
+                log.warn("🚨 Session {} for user {} is REVOKED in Keycloak. Purging from Valkey...", sid, session.getUsername());
+                redisTemplate.opsForValue().set("revoked_archive:" + sid, "revoked_in_keycloak", ARCHIVE_TTL);
+                redisTemplate.delete("session:" + sid);
+                redisTemplate.delete("pointer:" + sid);
+                return null;
+            } finally {
+                // Safely release lock if still held by this thread
+                String currentLock = redisTemplate.opsForValue().get(lockKey);
+                if (lockVal.equals(currentLock)) {
+                    redisTemplate.delete(lockKey);
+                }
+            }
+        } else {
+            // Lock is BUSY: Another thread is currently validating with Keycloak
+            // Wait for lock release (up to 2.5s with 50ms intervals) and re-read from Valkey
+            int maxAttempts = 50;
+            while (maxAttempts-- > 0) {
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                String currentLock = redisTemplate.opsForValue().get(lockKey);
+                if (currentLock == null) {
+                    // Lock was released! Re-check resolution
+                    SessionResolutionResult res = resolveSession(sid);
+                    if (res == null || res.getSession() == null) {
+                        // Session was deleted (revoked) by the validating thread
+                        return null;
+                    }
+                    return res.getSession();
+                }
+            }
+
+            // Fallback if lock wait timed out
+            SessionResolutionResult fallbackRes = resolveSession(sid);
+            return fallbackRes != null ? fallbackRes.getSession() : null;
+        }
     }
 
     public void destroySession(String sessionId, String refreshToken) {
