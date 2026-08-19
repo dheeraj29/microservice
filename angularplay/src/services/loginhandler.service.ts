@@ -51,11 +51,16 @@ export class UserService {
    * Initiates OIDC Federated SSO Login redirect via Keycloak (prompt=login forced).
    */
   loginWithKeycloak(redirectPath?: string) {
-    const isSpecialPath = window.location.pathname === '/' ||
-                          window.location.pathname === '/callback' ||
-                          window.location.pathname === '/login' ||
-                          window.location.pathname === '/logout';
-    const target = redirectPath || (!isSpecialPath ? window.location.pathname + window.location.search : '');
+    const candidate = redirectPath || (window.location.pathname + window.location.search);
+    const pathOnly = candidate ? candidate.split('?')[0] : '';
+    const isSpecialPath = !candidate ||
+                          pathOnly === '' ||
+                          pathOnly === '/' ||
+                          pathOnly === '/callback' ||
+                          pathOnly === '/login' ||
+                          pathOnly === '/logout';
+
+    const target = isSpecialPath ? '' : candidate;
     if (target) {
       window.location.href = `${this.bffAuthUrl}/login?redirect=${encodeURIComponent(target)}`;
     } else {
