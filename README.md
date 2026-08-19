@@ -58,17 +58,18 @@
 OmniBus implements the **IETF OAuth 2.0 Security Best Current Practice (BCP)** using the **Decentralized Embedded BFF Pattern**:
 
 1. **Zero Client-Side JWT Exposure**: Single Page Applications never receive or store raw JWT access or refresh tokens in JavaScript memory, `localStorage`, or `sessionStorage` (100% immune to XSS token exfiltration).
-2. **Opaque `__Host-` Session Cookies**: The browser only holds an opaque `HttpOnly; Secure; SameSite=Lax; Path=/` session cookie (`__Host-OmniSession`).
-3. **High-Performance Valkey User Info & Role Caching**: Cryptographic JWT decoding is executed **ONCE** at login/refresh via Nimbus JOSE; subsequent requests perform single $O(1)$ Valkey lookups reading `session.getUsername()` and `session.getRoles()` directly with **zero cryptographic parsing overhead**.
+2. **Dual-Channel Ingress (Web + AI/M2M)**: Web browsers authenticate via hardened `__Host-OmniSession` HttpOnly cookies resolved in Valkey; AI agents, Swagger, and M2M clients authenticate via `Authorization: Bearer <jwt>` cryptographically verified with cached **Keycloak JWKS RS256** signatures (`/protocol/openid-connect/certs`).
+3. **Periodic Bounded-Staleness Validation (30s Window)**: Employs **Distributed Double-Checked Locking (`lock:validate:<sid>`)** in Valkey. A single thread introspects Keycloak (`/protocol/openid-connect/token/introspect`) with silent refresh healing; concurrent threads re-read Valkey to eliminate stampedes and immediately detect revoked sessions.
 4. **4-Tier Interceptor & Filter Pipeline**:
    - `login.interceptor.ts` (Angular): Injects `withCredentials: true` and `X-Requested-With: XMLHttpRequest` (CSRF defense).
    - `csrfHeaderFilter` (Gateway): Rejects external state-changing requests missing browser CSRF headers.
-   - `BffSessionAuthenticationFilter` (Microservice Ingress): Resolves cookies directly from Valkey and authenticates Spring `SecurityContextHolder`.
+   - `BffSessionAuthenticationFilter` (Microservice Ingress): Resolves cookies directly from Valkey, periodically introspects Keycloak, verifies Bearer JWKS, and authenticates Spring `SecurityContextHolder`.
    - `FeignAuthRequestInterceptor` (Feign Egress): Relays user cookies on in-flight requests (Token Relay) and attaches M2M Service Account tokens on background/`@Scheduled` tasks.
-5. **Keycloak Client Isolation**: Public `angular-client` has password grants disabled (`directAccessGrantsEnabled: false`), and confidential `internal-backend-client` has browser login disabled (`standardFlowEnabled: false`), making external Postman token forgery impossible.
+5. **Keycloak Client Isolation & Auto-Bootstrap**: Public `angular-client` has password grants disabled (`directAccessGrantsEnabled: false`), and confidential `internal-backend-client` has browser login disabled (`standardFlowEnabled: false`). Keycloak 26.7.1 auto-bootstraps master admin credentials on startup.
 6. **Valkey Distributed Concurrency Mutex (`SET NX PX 5000`)**: Prevents parallel SPA AJAX requests from executing duplicate Keycloak refresh calls.
 7. **Session ID Rotation & 10s Grace Pointer**: On every token refresh, the session ID rotates atomically with a 10s forwarding grace bridge.
 8. **Intrusion Detection Kill-Switch**: Replaying expired sessions triggers instant Valkey cache purging and cluster-wide Keycloak revocation.
+9. **Angular OIDC PKCE Safe Deep-Linking**: Sanitizes redirect candidates against `/login`, `/logout`, `/callback`, and `/` to eliminate redirect loop traps.
 
 ---
 

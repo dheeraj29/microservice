@@ -135,8 +135,13 @@ Set-Cookie: __Host-OmniSession=8f3c7b2a-19d4-4a2e-b68e-9d2110c73e8f;
   "accessToken": "eyJhbGciOiJSUzI1NiIs...",
   "refreshToken": "eyJhbGciOiJIUzUxMiIs...",
   "accessTokenExpiresAt": "2026-08-17T06:30:00Z",
+  "lastValidatedAt": "2026-08-17T06:25:30Z",
   "username": "admin",
   "roles": ["ROLE_ADMIN", "ROLE_USER"],
+  "language": "en",
+  "timezone": "Asia/Kolkata",
+  "homepage": "/admin",
+  "theme": "dark",
   "clientFingerprint": "192.168.1.50"
 }
 ```
@@ -150,10 +155,26 @@ Set-Cookie: __Host-OmniSession=8f3c7b2a-19d4-4a2e-b68e-9d2110c73e8f;
 │ `session:<sessionId>`                │ 30 Minutes  │ Active user session holding Keycloak tokens & roles.   │
 │ `pointer:<oldSessionId>`             │ 10 Seconds  │ In-flight rotation pointer to prevent race conditions. │
 │ `lock:refresh:<oldSessionId>`        │ 5 Seconds   │ Distributed Mutex for single-thread token renewal.     │
+│ `lock:validate:<sessionId>`          │ 4 Seconds   │ Distributed Mutex for periodic Keycloak introspection. │
 │ `m2m:token:internal-backend-client`  │ Token TTL-30│ Cached Service Account Bearer token for OpenFeign.     │
 │ `revoked_archive:<sessionId>`        │ 1 Hour      │ Audit log of rotated sessions for hijack detection.    │
 └──────────────────────────────────────┴─────────────┴────────────────────────────────────────────────────────┘
 ```
+
+### 🔄 Periodic Keycloak Introspection with Distributed Double-Checked Locking (DCL)
+To guarantee real-time detection of tokens revoked in Keycloak without overwhelming the auth server:
+1. **Fast Path (< 30s)**: Reads `session:<sessionId>` from Valkey in **< 1ms** with zero network calls to Keycloak.
+2. **Stale Path (> 30s)**:
+   - **Lock Winner**: Acquires `lock:validate:<sessionId>` in Valkey (`SET lock:validate:<sid> <uuid> NX EX 4`).
+   - Calls Keycloak's RFC 7662 introspection endpoint (`/protocol/openid-connect/token/introspect`).
+   - If active: updates `lastValidatedAt = now()` in Valkey and releases the lock.
+   - If inactive: attempts silent auto-healing with `refresh_token`. If refresh fails (session revoked by admin), deletes `session:<sessionId>` from Valkey and records a revocation archive.
+   - **Lock Waiters (Double-Checked Locking)**: Concurrent requests wait 50ms for lock release and re-read Valkey. If the session was purged by the winner, they immediately return `401 Unauthorized`. Thundering herds are completely eliminated.
+
+### 🛡️ Dual-Channel Ingress Authentication
+- **Channel 1 (Web Browsers)**: Uses the hardened `__Host-OmniSession` HttpOnly cookie, resolved via Valkey.
+- **Channel 2 (AI Agents, APIs, M2M, Swagger)**: Uses standard `Authorization: Bearer <jwt>`. Cryptographically verified using cached **Keycloak JWKS RS256** signatures (`/protocol/openid-connect/certs`) and verified against `exp` (expiry) and `iss` (issuer).
+- Both channels converge cleanly into Spring's `SecurityContextHolder` with `@PreAuthorize` role enforcement.
 
 ---
 
