@@ -88,6 +88,10 @@
 			<groupId>com.da.demo</groupId>
 			<artifactId>common-security</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-mcp-server</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>

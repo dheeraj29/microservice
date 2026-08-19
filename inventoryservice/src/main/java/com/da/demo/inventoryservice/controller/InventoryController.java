@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.loadbalancer.LoadBalancerClient;
@@ -38,6 +39,7 @@ public class InventoryController {
 	@Autowired
 	BusInventoryService busInventoryService;
 	
+	@Tool(description = "Check seat vacancy and return available bus number operating between cities")
 	@Retry(name = "seatsAvailabilityRetry")
 	@CircuitBreaker(name="seatsAvailabilityCB")
 	@GetMapping("/getSeatAvailability")
@@ -62,6 +64,7 @@ public class InventoryController {
 		return 101;
 	}
 
+	@Tool(description = "Retrieve live interactive seat map layout and availability grid for a bus")
 	@GetMapping("/busSeatLayout/{busNumber}")
 	public List<Map<String, Object>> getBusSeatLayout(@PathVariable("busNumber") Integer busNumber) {
 		List<Map<String, Object>> seats = new ArrayList<>();
@@ -91,6 +94,7 @@ public class InventoryController {
 		return seats;
 	}
 	
+	@Tool(description = "Initialize and register seat capacity inventory for a new bus")
 	@GetMapping("/addBus")
 	public String saveBusInventory(@RequestParam(name="busNumber",required=true) Integer busNumber,
 			@RequestParam(name="totalSeats",required=true) Integer totalSeats) {

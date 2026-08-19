@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.loadbalancer.LoadBalancerClient;
@@ -42,6 +43,7 @@ public class BookingController {
 	@Autowired(required = false)
 	private RabbitMQProducer rabbitMQProducer;
 	
+	@Tool(description = "Book passenger bus seats and confirm travel reservation")
 	@Retry(name="seatsCheckRetry")
 	@CircuitBreaker(name="seatsCheckCB")
 	@PostMapping("/bookSeat")
@@ -51,7 +53,7 @@ public class BookingController {
 			@RequestParam(name="requiredSeats") Integer requiredSeats,
 			@RequestParam(name="bookingUser", required=false) String bookingUser,
 			@RequestParam(name="busNumber", required=false) Integer explicitBusNumber,
-			@RequestHeader HttpHeaders requestHeaders) {
+			@RequestHeader(required=false) HttpHeaders requestHeaders) {
 		
 		Integer busNumber = explicitBusNumber != null ? explicitBusNumber : 101;
 		
@@ -65,9 +67,11 @@ public class BookingController {
 		} catch (Exception e) { org.slf4j.LoggerFactory.getLogger(BookingController.class).warn("Feign inventory check note: {}", e.getMessage()); }
 
 		String resolvedUser = (bookingUser != null && !bookingUser.isBlank()) ? bookingUser : "john_doe";
-		List<String> userHeaders = requestHeaders.getOrEmpty("X-Authenticated-User");
-		if (!userHeaders.isEmpty() && !userHeaders.get(0).isBlank()) {
-			resolvedUser = userHeaders.get(0);
+		if (requestHeaders != null) {
+			List<String> userHeaders = requestHeaders.getOrEmpty("X-Authenticated-User");
+			if (!userHeaders.isEmpty() && !userHeaders.get(0).isBlank()) {
+				resolvedUser = userHeaders.get(0);
+			}
 		}
 
 		BookingModel bookingModel = new BookingModel();
@@ -90,19 +94,23 @@ public class BookingController {
 		return ResponseEntity.ok(bookedModel != null ? bookedModel : bookingModel);
 	}
 
+	@Tool(description = "Retrieve list of all active and past bookings for a passenger username")
 	@GetMapping("/myBookings")
 	public List<BookingModel> getMyBookings(
 			@RequestParam(name="username", required=false) String username,
-			@RequestHeader HttpHeaders requestHeaders) {
+			@RequestHeader(required=false) HttpHeaders requestHeaders) {
 		String targetUser = (username != null && !username.isBlank()) ? username : "john_doe";
-		List<String> userHeaders = requestHeaders.getOrEmpty("X-Authenticated-User");
-		if (!userHeaders.isEmpty() && !userHeaders.get(0).isBlank()) {
-			targetUser = userHeaders.get(0);
+		if (requestHeaders != null) {
+			List<String> userHeaders = requestHeaders.getOrEmpty("X-Authenticated-User");
+			if (!userHeaders.isEmpty() && !userHeaders.get(0).isBlank()) {
+				targetUser = userHeaders.get(0);
+			}
 		}
 		List<BookingModel> bookings = bookingService.findByBookingUser(targetUser);
 		return bookings != null ? bookings : new ArrayList<>();
 	}
 
+	@Tool(description = "Get detailed booking information and ticket status by numeric booking ID")
 	@GetMapping("/booking/{id}")
 	public ResponseEntity<BookingModel> getBookingById(@PathVariable("id") Integer id) {
 		BookingModel model = bookingService.findById(id);
@@ -112,6 +120,7 @@ public class BookingController {
 		return ResponseEntity.notFound().build();
 	}
 
+	@Tool(description = "Cancel an existing passenger booking and release reserved seats")
 	@PostMapping("/cancelBooking")
 	public ResponseEntity<String> cancelBooking(
 			@RequestParam(name="bookingNumber", required=false) Integer bookingNumber,

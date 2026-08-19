@@ -42,7 +42,8 @@ public class CommonSecurityConfig {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).permitAll()
-                        .requestMatchers("/actuator/**").hasRole("ADMIN")
+                        .requestMatchers("/actuator/**", "/mcp/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/mcp/**").hasAnyRole("USER", "ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

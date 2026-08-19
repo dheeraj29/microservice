@@ -51,6 +51,18 @@ spring:
             predicates:
             - Path=/paymentservice/**
             uri: lb://paymentservice
+          - id: mcp-admin
+            predicates:
+            - Path=/mcp/admin/**
+            uri: lb://adminservice
+          - id: mcp-booking
+            predicates:
+            - Path=/mcp/booking/**
+            uri: lb://bookingservice
+          - id: mcp-inventory
+            predicates:
+            - Path=/mcp/inventory/**
+            uri: lb://inventoryservice
           - id: angular-frontend
             predicates:
             - Path=/**

@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +37,7 @@ public class AdminController {
 	@Autowired(required = false)
 	private com.da.demo.adminservice.client.InventoryClient inventoryClient;
 
+	@Tool(description = "Register and schedule a new bus in the transport fleet")
 	@PostMapping("/addBusDetails")
 	@PreAuthorize("hasRole('ADMIN')")
 	@Retry(name = "addSeatRetry")
@@ -53,16 +55,19 @@ public class AdminController {
 		return ResponseEntity.status(HttpStatus.CREATED).body("Bus added successfully");
 	}
 
+	@Tool(description = "Retrieve all scheduled buses and routes across the transport fleet")
 	@GetMapping("/allBuses")
 	public ResponseEntity<List<BusModel>> getAllBuses() {
 		return ResponseEntity.ok(busDetailsService.findAllBuses());
 	}
 
+	@Tool(description = "Get executive dashboard statistics including total fleet count, capacity, and system health")
 	@GetMapping("/dashboardStats")
 	public ResponseEntity<Map<String, Object>> getDashboardStats() {
 		return ResponseEntity.ok(busDetailsService.getDashboardStats());
 	}
 
+	@Tool(description = "Find bus details and seat configuration by unique bus number")
 	@GetMapping("/findBusDetailsByNumber")
 	public ResponseEntity<BusModel> findByDetails(@RequestParam(name = "busNumber", required = true) Integer busNumber) {
 		BusModel busRoute = busDetailsService.findByBusNumber(busNumber);
@@ -72,6 +77,7 @@ public class AdminController {
 		return ResponseEntity.ok(busRoute);
 	}
 
+	@Tool(description = "Find all bus numbers operating between departure and destination cities")
 	@GetMapping("/findBusDetailsBySourceAndDestination")
 	public ResponseEntity<List<Integer>> findBusDetailsBySourceAndDestination(
 			@RequestParam(name = "source", required = true) String source,
@@ -98,6 +104,7 @@ public class AdminController {
 		return ResponseEntity.ok(busRoute);
 	}
 
+	@Tool(description = "Remove a bus from service by its bus number")
 	@DeleteMapping("/deleteBusDetails")
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<String> deleteBusDetails(@RequestParam(name = "busNumber", required = true) Integer busNumber) {

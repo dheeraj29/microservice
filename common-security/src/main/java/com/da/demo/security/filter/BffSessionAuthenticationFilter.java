@@ -105,11 +105,18 @@ public class BffSessionAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } else {
-            // 3. Fallback to Authorization: Bearer <jwt> (e.g. Swagger-UI, Feign M2M, External APIs)
+            // 3. Fallback to Authorization: Bearer <jwt> or query param ?access_token=<jwt> (e.g. MCP SSE AI Clients, Swagger-UI, Feign M2M)
+            String token = null;
             String authHeader = request.getHeader("Authorization");
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                String token = authHeader.substring(7).trim();
-                if (!token.isBlank()) {
+                token = authHeader.substring(7).trim();
+            } else if (request.getParameter("access_token") != null && !request.getParameter("access_token").isBlank()) {
+                token = request.getParameter("access_token").trim();
+            } else if (request.getParameter("token") != null && !request.getParameter("token").isBlank()) {
+                token = request.getParameter("token").trim();
+            }
+
+            if (token != null && !token.isBlank()) {
                     try {
                         com.nimbusds.jwt.JWTClaimsSet claims = keycloakAuthService.verifyAndDecodeJwt(token);
                         String username = claims.getStringClaim("preferred_username");
@@ -148,7 +155,6 @@ public class BffSessionAuthenticationFilter extends OncePerRequestFilter {
                         log.debug("Bearer token verification note: {}", e.getMessage());
                     }
                 }
-            }
         }
 
         filterChain.doFilter(request, response);

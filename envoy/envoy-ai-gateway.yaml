@@ -1,0 +1,175 @@
+﻿# ==============================================================================
+# OmniBus Transport Mesh - Envoy AI Gateway (v1.0.0 Compatible Configuration)
+# ==============================================================================
+# High-Performance Cloud-Native AI Ingress Gateway for Model Context Protocol (MCP),
+# Server-Sent Events (SSE) Streaming, Token-Bucket Rate Limiting & OAuth2 Governance.
+# ==============================================================================
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901
+
+static_resources:
+  listeners:
+  - name: envoy_ai_gateway_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: envoy_ai_gateway
+          codec_type: AUTO
+          stream_idle_timeout: 0s # Infinite timeout for Server-Sent Events (SSE) AI streams
+          delayed_close_timeout: 0s
+
+          # --- Global AI CORS Policy ---
+          route_config:
+            name: mcp_mesh_routes
+            virtual_hosts:
+            - name: omnibus_ai_mesh
+              domains: ["*"]
+              cors:
+                allow_origin_string_match:
+                - safe_regex:
+                    google_re2: {}
+                    regex: ".*"
+                allow_methods: "GET, PUT, POST, DELETE, OPTIONS"
+                allow_headers: "Authorization, Content-Type, Accept, X-Requested-With, X-Authenticated-User"
+                allow_credentials: true
+                max_age: "3600"
+
+              routes:
+              # --- 1. Admin Fleet Operations MCP Server ---
+              - match:
+                  prefix: "/mcp/admin"
+                route:
+                  cluster: adminservice_cluster
+                  timeout: 0s # SSE Infinite Streaming
+                  idle_timeout: 0s
+                  max_stream_duration:
+                    grpc_timeout_header_max: 0s
+                response_headers_to_add:
+                - header:
+                    key: "X-AI-Gateway-Router"
+                    value: "Envoy-AI-Gateway-v1.0.0"
+                - header:
+                    key: "X-MCP-Domain"
+                    value: "Admin-Fleet-Operations"
+
+              # --- 2. Booking & Reservation MCP Server ---
+              - match:
+                  prefix: "/mcp/booking"
+                route:
+                  cluster: bookingservice_cluster
+                  timeout: 0s
+                  idle_timeout: 0s
+                  max_stream_duration:
+                    grpc_timeout_header_max: 0s
+                response_headers_to_add:
+                - header:
+                    key: "X-AI-Gateway-Router"
+                    value: "Envoy-AI-Gateway-v1.0.0"
+                - header:
+                    key: "X-MCP-Domain"
+                    value: "Passenger-Reservation"
+
+              # --- 3. Inventory & Route Schedules MCP Server ---
+              - match:
+                  prefix: "/mcp/inventory"
+                route:
+                  cluster: inventoryservice_cluster
+                  timeout: 0s
+                  idle_timeout: 0s
+                  max_stream_duration:
+                    grpc_timeout_header_max: 0s
+                response_headers_to_add:
+                - header:
+                    key: "X-AI-Gateway-Router"
+                    value: "Envoy-AI-Gateway-v1.0.0"
+                - header:
+                    key: "X-MCP-Domain"
+                    value: "Seat-Inventory"
+
+              # --- 4. Fallback REST & Auth Gateway Routing ---
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: spring_gateway_cluster
+                  timeout: 60s
+
+          # --- HTTP Filters Pipeline ---
+          http_filters:
+          - name: envoy.filters.http.cors
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  # --- Upstream Microservice Clusters ---
+  clusters:
+  # 1. Admin Microservice
+  - name: adminservice_cluster
+    connect_timeout: 2s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: adminservice_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: host.docker.internal
+                port_value: 8081
+
+  # 2. Booking Microservice
+  - name: bookingservice_cluster
+    connect_timeout: 2s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: bookingservice_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: host.docker.internal
+                port_value: 8083
+
+  # 3. Inventory Microservice
+  - name: inventoryservice_cluster
+    connect_timeout: 2s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: inventoryservice_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: host.docker.internal
+                port_value: 8082
+
+  # 4. Spring Cloud Gateway (Edge Fallback)
+  - name: spring_gateway_cluster
+    connect_timeout: 2s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: spring_gateway_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: host.docker.internal
+                port_value: 8080
