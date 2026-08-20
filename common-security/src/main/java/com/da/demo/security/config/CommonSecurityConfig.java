@@ -34,6 +34,7 @@ public class CommonSecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/auth/**",
+                                "/mcp/**",
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/actuator/info",
@@ -42,8 +43,7 @@ public class CommonSecurityConfig {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).permitAll()
-                        .requestMatchers("/actuator/**", "/mcp/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/mcp/**").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

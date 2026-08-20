@@ -42,9 +42,9 @@ public class SecurityConfig {
             String method = exchange.getRequest().getMethod().name();
             String path = exchange.getRequest().getURI().getPath();
 
-            // Skip safe methods and auth endpoints (auth/login and auth/logout use GET redirects)
+            // Skip safe methods and public API/MCP endpoints
             if ("GET".equals(method) || "HEAD".equals(method) || "OPTIONS".equals(method)
-                    || path.startsWith("/auth/") || path.startsWith("/actuator/") || path.startsWith("/eureka/")) {
+                    || path.startsWith("/auth/") || path.startsWith("/actuator/") || path.startsWith("/eureka/") || path.startsWith("/mcp/") || path.startsWith("/realms/")) {
                 return chain.filter(exchange);
             }
 

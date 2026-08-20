@@ -63,6 +63,12 @@ spring:
             predicates:
             - Path=/mcp/inventory/**
             uri: lb://inventoryservice
+          - id: keycloak-wellknown
+            predicates:
+            - Path=/.well-known/**
+            filters:
+            - PrefixPath=/realms/bus-reservation
+            uri: http://localhost:8088
           - id: keycloak-realm
             predicates:
             - Path=/realms/bus-reservation/**
