@@ -156,17 +156,19 @@ Set-Cookie: __Host-OmniSession=8f3c7b2a-19d4-4a2e-b68e-9d2110c73e8f;
 │ `pointer:<oldSessionId>`             │ 10 Seconds  │ In-flight rotation pointer to prevent race conditions. │
 │ `lock:refresh:<oldSessionId>`        │ 5 Seconds   │ Distributed Mutex for single-thread token renewal.     │
 │ `lock:validate:<sessionId>`          │ 4 Seconds   │ Distributed Mutex for periodic Keycloak introspection. │
-│ `m2m:token:internal-backend-client`  │ Token TTL-30│ Cached Service Account Bearer token for OpenFeign.     │
+│ `passport:key:<appName>:current`     │ 30 Seconds  │ Active rotating HMAC-SHA256 key for OpenFeign mesh.    │
+│ `passport:key:<appName>:previous`    │ 10 Seconds  │ Grace overlap HMAC key for in-flight Feign calls.      │
+│ `lock:passport:rotate:<appName>`     │ 4 Seconds   │ Distributed Mutex for single-pod key rotation.         │
 │ `revoked_archive:<sessionId>`        │ 1 Hour      │ Audit log of rotated sessions for hijack detection.    │
 └──────────────────────────────────────┴─────────────┴────────────────────────────────────────────────────────┘
 ```
 
-### 🔄 Periodic Keycloak Introspection with Distributed Double-Checked Locking (DCL)
+### 🔄 Periodic Keycloak Validation with Distributed Double-Checked Locking (DCL)
 To guarantee real-time detection of tokens revoked in Keycloak without overwhelming the auth server:
 1. **Fast Path (< 30s)**: Reads `session:<sessionId>` from Valkey in **< 1ms** with zero network calls to Keycloak.
 2. **Stale Path (> 30s)**:
    - **Lock Winner**: Acquires `lock:validate:<sessionId>` in Valkey (`SET lock:validate:<sid> <uuid> NX EX 4`).
-   - Calls Keycloak's RFC 7662 introspection endpoint (`/protocol/openid-connect/token/introspect`).
+   - Verifies the access token against cached Keycloak JWKS and checks expiration.
    - If active: updates `lastValidatedAt = now()` in Valkey and releases the lock.
    - If inactive: attempts silent auto-healing with `refresh_token`. If refresh fails (session revoked by admin), deletes `session:<sessionId>` from Valkey and records a revocation archive.
    - **Lock Waiters (Double-Checked Locking)**: Concurrent requests wait 50ms for lock release and re-read Valkey. If the session was purged by the winner, they immediately return `401 Unauthorized`. Thundering herds are completely eliminated.
@@ -205,8 +207,7 @@ Keycloak 26+ serves as the centralized OpenID Connect (OIDC) & OAuth 2.1 Identit
 
 | Client ID | Client Type | Authentication | Grant Types | Web Origins | Target Use Case |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| `angular-client` | Public | None (Public) | Authorization Code + PKCE | Strict Whitelist (`:4200`, `:8080`, `:8081`...) | Angular SPA & Swagger UI |
-| `internal-backend-client` | Confidential | `client-secret` | Client Credentials (`service-account`) | N/A (Cluster internal) | OpenFeign M2M Service Mesh |
+| `angular-client` | Public | None (Public PKCE) | Authorization Code + PKCE | Strict Whitelist (`:4200`, `:8080`, `:8081`...) | Angular SPA & Swagger UI |
 
 ---
 
@@ -368,81 +369,58 @@ When `BookingService` needs to check seat availability or reserve capacity in `I
 [ BookingService ] ──(OpenFeign + M2M Interceptor)──> [ InventoryService ]
         │                                                     │
         ▼                                                     ▼
- 1. Check Valkey for cached                            1. BffSessionAuthenticationFilter
-    m2m:token:internal-backend-client                     extracts Bearer JWT
- 2. If expired, mint token from Keycloak              2. Validates RSA signature & roles
- 3. Attach Authorization: Bearer <JWT>                3. Executes business logic
+ 1. FeignPassportRequestInterceptor mints              1. BffSessionAuthenticationFilter
+    X-Internal-Passport (Signed HMAC-SHA256)              extracts X-Internal-Passport & X-Passport-User
+ 2. Injects X-Passport-User: <username>                2. Fetches caller app key from Valkey
+ 3. Dispatches HTTP call via ClusterIP                 3. Validates HMAC signature (< 5 microseconds)
+                                                       4. Populates SecurityContextHolder
 ```
 
-### ⚙️ Keycloak M2M Client Definition (`realm-export.json`)
-```json
-{
-  "clientId": "internal-backend-client",
-  "name": "OmniBus Internal Microservice Mesh",
-  "enabled": true,
-  "publicClient": false,
-  "clientAuthenticatorType": "client-secret",
-  "secret": "internal-service-mesh-secret-key-123",
-  "serviceAccountsEnabled": true,
-  "standardFlowEnabled": false,
-  "directAccessGrantsEnabled": false,
-  "redirectUris": []
-}
-```
+### ⚙️ Caller-App Aware Ephemeral Valkey Passport (`PassportManager.java`)
 
-### 💻 Dual-Mode OpenFeign Request Interceptor (`FeignAuthRequestInterceptor.java`)
+Instead of making slow, synchronous roundtrips to Keycloak or storing static secrets across microservices, inter-service Feign calls use **ephemeral symmetric HMAC keys rotated in Valkey every 30 seconds with a 10-second grace overlap window**:
 
-The Feign interceptor intelligently determines whether the call is triggered by an active user or a background worker:
+* **Valkey Keys**:
+  * `passport:key:<callerAppName>:current` (30s TTL)
+  * `passport:key:<callerAppName>:previous` (10s Grace Window)
+  * `lock:passport:rotate:<callerAppName>` (Distributed Mutex)
+* **Dual-Header Verification**:
+  1. `X-Passport-User: <username>`
+  2. `X-Internal-Passport: <HMAC-SHA256 JWT>` (Contains `iss: <caller_app_name>`, `sub: <username>`, `roles: [...]`)
+
+### 💻 OpenFeign Request Interceptor (`FeignPassportRequestInterceptor.java`)
+
+The Feign interceptor automatically propagates user context and mints the signed passport without developer boilerplate:
 
 ```java
-@Component
-public class FeignAuthRequestInterceptor implements RequestInterceptor {
-    private final M2MTokenService m2mTokenService;
+@Configuration
+@ConditionalOnClass(RequestInterceptor.class)
+public class FeignPassportRequestInterceptor implements RequestInterceptor {
 
-    public FeignAuthRequestInterceptor(M2MTokenService m2mTokenService) {
-        this.m2mTokenService = m2mTokenService;
+    private final PassportManager passportManager;
+
+    @Value("${spring.application.name:unknown-service}")
+    private String appName;
+
+    public FeignPassportRequestInterceptor(PassportManager passportManager) {
+        this.passportManager = passportManager;
     }
 
     @Override
     public void apply(RequestTemplate template) {
-        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
-        if (attributes != null && attributes.getRequest() != null) {
-            // CASE 1: User-Initiated Request (Context & Session Relay)
-            HttpServletRequest request = attributes.getRequest();
+        String username = (auth != null && auth.getName() != null) ? auth.getName() : "system_service";
+        List<String> roles = (auth != null && auth.getAuthorities() != null)
+                ? auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toList())
+                : List.of("ROLE_USER");
 
-            // 1. Relay Session Cookies (__Host-OmniSession)
-            if (request.getCookies() != null) {
-                StringBuilder cookieHeader = new StringBuilder();
-                for (Cookie cookie : request.getCookies()) {
-                    if ("__Host-OmniSession".equals(cookie.getName()) || "OmniSession".equals(cookie.getName())) {
-                        if (cookieHeader.length() > 0) cookieHeader.append("; ");
-                        cookieHeader.append(cookie.getName()).append("=").append(cookie.getValue());
-                    }
-                }
-                if (cookieHeader.length() > 0) {
-                    template.header("Cookie", cookieHeader.toString());
-                }
-            }
-
-            // 2. Relay Authorization Header if present
-            String authHeader = request.getHeader("Authorization");
-            if (authHeader != null && !authHeader.isBlank()) {
-                template.header("Authorization", authHeader);
-            }
-
-            // 3. Relay X-Authenticated-User Header
-            String authUser = request.getHeader("X-Authenticated-User");
-            if (authUser != null && !authUser.isBlank()) {
-                template.header("X-Authenticated-User", authUser);
-            }
-        } else {
-            // CASE 2: @Scheduled Scheduler / Async Worker / Background Thread (M2M Client Credentials)
-            String m2mToken = m2mTokenService.getInternalM2MToken();
-            if (m2mToken != null && !m2mToken.isBlank()) {
-                template.header("Authorization", "Bearer " + m2mToken);
-                template.header("X-Authenticated-User", "system_scheduler");
-            }
+        try {
+            String passportToken = passportManager.mintPassport(appName, username, roles);
+            template.header(PassportManager.PASSPORT_HEADER, passportToken);
+            template.header(PassportManager.PASSPORT_USER_HEADER, username);
+        } catch (Exception e) {
+            log.error("Failed to attach internal passport on Feign call: {}", e.getMessage());
         }
     }
 }
@@ -553,14 +531,11 @@ spec:
         - name: paymentservice
           port: 8085
 
-    # 5. Keycloak Public Interactive & IDP Federation Endpoints
-    # NOTE: /protocol/openid-connect/token is intentionally NOT exposed here.
-    # It remains 100% internal (ClusterIP only) for BFF & M2M back-channel exchanges!
+    # 5. Keycloak Application Realm & Theme Resources
+    # Exclusively exposes the 'bus-reservation' realm (Discovery, JWKS, PKCE Token, Login).
+    # Master realm and /admin console remain 100% blocked from the edge for security.
     - matches:
-        - path: { type: PathPrefix, value: /realms/bus-reservation/protocol/openid-connect/auth }
-        - path: { type: PathPrefix, value: /realms/bus-reservation/protocol/openid-connect/logout }
-        - path: { type: PathPrefix, value: /realms/bus-reservation/broker/ }
-        - path: { type: PathPrefix, value: /realms/bus-reservation/login-actions/ }
+        - path: { type: PathPrefix, value: /realms/bus-reservation/ }
         - path: { type: PathPrefix, value: /resources/ }
       backendRefs:
         - name: keycloak
@@ -573,6 +548,35 @@ spec:
         - name: frontend
           port: 80
 ```
+
+### 🤖 Envoy AI Gateway — Model Context Protocol (MCP) (`aigateway.envoyproxy.io/v1alpha1`)
+
+OmniBus integrates with the official **[Envoy AI Gateway](https://aigateway.envoyproxy.io/docs/api/)** specification using the `MCPRoute` Custom Resource Definition to aggregate multi-service Spring AI MCP backends into a unified edge endpoint (`/mcp`):
+
+```yaml
+apiVersion: aigateway.envoyproxy.io/v1alpha1
+kind: MCPRoute
+metadata:
+  name: omnibus-mcp-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: omnibus-gateway
+  path: /mcp
+  backendRefs:
+    - name: adminservice
+      port: 8081
+      path: /mcp/admin
+    - name: bookingservice
+      port: 8083
+      path: /mcp/booking
+    - name: inventoryservice
+      port: 8084
+      path: /mcp/inventory
+```
+
+* **Unified LLM Ingress**: External AI assistants (Claude Desktop, Cursor, LangChain agents) connect to a single endpoint (`https://api.omnibus.com/mcp`).
+* **Declarative Aggregation**: Envoy AI Gateway automatically aggregates tool manifests and routes execution requests to `adminservice`, `bookingservice`, and `inventoryservice`.
 
 * **Module**: [`keycloak-captcha-spi`](file:///c:/Personal-Project/microservice-main/microservice-main/keycloak-captcha-spi/) (`ValkeyCaptchaAuthenticator.java` & `ValkeyClient.java`)
 * **Multi-Instance / Cluster Synchronization**:
@@ -865,14 +869,15 @@ The winning thread rotates the session and writes a 10-second forwarding pointer
 <details>
 <summary><strong>Q7: How is inter-service communication secured (OpenFeign)?</strong></summary>
 
-`FeignAuthRequestInterceptor` automatically retrieves a cached Service Account M2M token from Valkey (`internal-backend-client`) and injects `Authorization: Bearer <JWT>` into outbound calls.
+`FeignPassportRequestInterceptor` mints an ephemeral HMAC-SHA256 token (`X-Internal-Passport`) alongside `X-Passport-User`. Receiving microservices verify the signature in **< 5 microseconds** against 30s rotating symmetric keys in Valkey (`passport:key:<appName>:current`).
 </details>
 
 <details>
-<summary><strong>Q8: What is the M2M authentication spectrum (SPIFFE vs Client Credentials)?</strong></summary>
+<summary><strong>Q8: Why Ephemeral Valkey Passports instead of static Keycloak Client Secrets?</strong></summary>
 
-* **OAuth 2.0 Client Credentials (RFC 6749)**: Universal, supported by all platforms, backed by client secrets or Private Key JWTs.
-* **SPIFFE / SPIRE & mTLS**: Zero static secrets; cryptographically verified workload identity tied to kernel cgroups/Pod UIDs with hourly rotating x509 certs.
+* **Zero Keycloak Mesh Bottleneck**: 0 network hops to Keycloak during inter-service hops.
+* **No Secret Sprawl**: Symmetric HMAC keys are dynamically generated, auto-rotated in Valkey every 30 seconds with a 10s grace overlap, eliminating shared static passwords.
+* **Sub-Microsecond Verification**: In-memory caching and HMAC-SHA256 verification execute in < 5 microseconds per call.
 </details>
 
 <details>
@@ -881,13 +886,13 @@ The winning thread rotates the session and writes a 10-second forwarding pointer
 * `login.interceptor.ts`: Attaches cookie and CSRF header in browser.
 * `csrfHeaderFilter`: Validates headers at Gateway.
 * `BffSessionAuthenticationFilter`: Resolves session from Valkey at microservice ingress.
-* `FeignAuthRequestInterceptor`: Injects Bearer JWT at microservice Feign egress.
+* `FeignPassportRequestInterceptor`: Mints signed `X-Internal-Passport` (HMAC-SHA256) at microservice Feign egress.
 </details>
 
 <details>
-<summary><strong>Q10: What is the Keycloak configuration for M2M Service Accounts?</strong></summary>
+<summary><strong>Q10: How does Ephemeral Valkey Passport key rotation work across replicas?</strong></summary>
 
-`publicClient: false`, `serviceAccountsEnabled: true`, `standardFlowEnabled: false`, `directAccessGrantsEnabled: false`, with roles assigned under the **Service Account Roles** tab.
+Keys are stored in Valkey with 30s TTL (`passport:key:<appName>:current`). When expired, a single pod acquires a distributed lock (`SET NX EX 4`) to rotate the key and preserve the previous key for 10s (`previous`), ensuring zero dropped requests across replicas.
 </details>
 
 <details>

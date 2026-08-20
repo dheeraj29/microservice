@@ -44,23 +44,13 @@ spec:
         - name: paymentservice
           port: 8085
 
-    # 5. Keycloak Public Interactive & IDP Federation Endpoints
-    # Supports local Keycloak login, Azure Entra ID / Okta broker redirects, and theme assets.
-    # NOTE: /protocol/openid-connect/token is intentionally NOT exposed here.
-    # It remains 100% internal (ClusterIP only) for BFF & M2M back-channel exchanges!
+    # 5. Keycloak Application Realm & Theme Resources
+    # Exclusively exposes the 'bus-reservation' realm (Discovery, JWKS, PKCE Token, Login).
+    # Master realm and /admin console remain 100% blocked from the edge for security.
     - matches:
         - path:
             type: PathPrefix
-            value: /realms/bus-reservation/protocol/openid-connect/auth
-        - path:
-            type: PathPrefix
-            value: /realms/bus-reservation/protocol/openid-connect/logout
-        - path:
-            type: PathPrefix
-            value: /realms/bus-reservation/broker/
-        - path:
-            type: PathPrefix
-            value: /realms/bus-reservation/login-actions/
+            value: /realms/bus-reservation/
         - path:
             type: PathPrefix
             value: /resources/

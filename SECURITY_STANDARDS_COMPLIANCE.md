@@ -23,17 +23,17 @@
 The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Architecture (ZTA)** that enforces defense-in-depth across all system boundaries:
 
 ```
-[ Angular 21 SPA ]
+[ Angular 21 SPA / MCP AI Agents ]
         │  ▲
-        │  │  HttpOnly, Secure, SameSite=Lax Cookie (__Host-OmniSession)
+        │  │  HttpOnly Cookie (__Host-OmniSession) or Bearer JWT
         ▼  │  [NO Raw JWTs in JavaScript / localStorage]
-[ Edge Gateway / BFF ] ──(PKCE S256 + State)──► [ Keycloak 26+ IAM ]
-        │                                                │
-        │ (Opaque Session Cache)                         │ (M2M Service Account JWTs)
-        ▼                                                ▼
-[ Valkey 8+ Cluster ] ◄──────────────────────────────────┘
+[ Edge Gateway / Envoy AI Gateway ] ──(PKCE S256 + State)──► [ Keycloak 26+ IAM ]
+        │                                                           │
+        │ (Opaque Session Cache)                                    │ (Public JWKS RS256)
+        ▼                                                           ▼
+[ Valkey 9+ Cluster ] ◄─────────────────────────────────────────────┘
         │
-        │ OpenFeign + M2M Bearer Token (RSA Signed JWKS)
+        │ OpenFeign + Ephemeral Dual-Header Passport (HMAC-SHA256 < 5μs)
         ▼
 [ Core Microservices ] ──(AMQP Events)──► [ RabbitMQ Cluster ]
 ```
@@ -42,7 +42,8 @@ The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Archi
 * **Token Isolation**: Single Page Applications (SPA) never handle, inspect, or store raw JSON Web Tokens (JWTs), eliminating JavaScript token theft via Cross-Site Scripting (XSS).
 * **Decentralized Embedded BFF**: Microservices independently validate opaque session cookies against a shared high-performance Valkey cache, eliminating monolithic Gateway CPU bottlenecks.
 * **Cryptographic Authorization Code Exchange (PKCE)**: Mandatory RFC 7636 SHA-256 (`S256`) code challenges for both Swagger UI and BFF authentication orchestrators.
-* **Dual-Mode Microservice Mesh**: Inter-service OpenFeign calls automatically relay the active user's session context for interactive requests, while asynchronously falling back to cryptographically signed OAuth 2.0 Client Credentials (M2M) for `@Scheduled` background jobs and asynchronous workers.
+* **Ephemeral Valkey Passport for OpenFeign (Netflix MINT Architecture)**: Inter-service Feign calls bypass Keycloak network roundtrips using rolling 30-second HMAC-SHA256 symmetric keys with a 10-second grace overlap window (`X-Internal-Passport` + `X-Passport-User`), verifying inter-service calls in `< 5 microseconds`.
+* **Model Context Protocol (MCP) Governance**: Spring AI 2.0.0 `@Tool` endpoints enforce method-level `@PreAuthorize("hasRole('ADMIN')")` RBAC for AI agent invocations.
 
 ---
 
@@ -55,7 +56,7 @@ The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Archi
 | **Unauthorized Endpoint Access** | Role-Based Access Control (RBAC) enforced via `@PreAuthorize("hasRole('ADMIN')")` and `@PreAuthorize("hasRole('USER')")` at controller and method levels. | [`AdminController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/adminservice/src/main/java/com/da/demo/adminservice/controller/AdminController.java), [`BookingController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/bookingservice/src/main/java/com/da/demo/bookingservice/controller/BookingController.java) |
 | **Actuator Information Exposure** | Sensitive actuator endpoints (`/env`, `/heapdump`, `/beans`, `/configprops`) are permanently disabled. Only `/health`, `/info`, and `/prometheus` are exposed. | [`application.properties`](file:///c:/Personal-Project/microservice-main/microservice-main/adminservice/src/main/resources/application.properties) (`management.endpoints.web.exposure.include=health,info,prometheus`) |
 | **User Attribute Privilege Escalation** | Profile & preference updates (`language`, `theme`, etc.) use the **User's Active Bearer Token** via Keycloak's Account API (`/realms/{realm}/account`). Eliminates broad admin tokens (`manage-users`), guaranteeing users can only modify their own attributes. | [`KeycloakAuthService.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/service/KeycloakAuthService.java), [`BffAuthController.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/controller/BffAuthController.java) |
-| **Direct Token Endpoint Exposure** | Kubernetes Gateway API (`HTTPRoute`) isolates Keycloak's token minting endpoint (`/protocol/openid-connect/token`) to internal ClusterIP. Only public interactive UI endpoints (`/auth`, `/logout`, `/broker/`) are routeable from the edge. | [`envoy/httproute.yaml`](file:///c:/Personal-Project/microservice-main/microservice-main/envoy/httproute.yaml) |
+| **Direct Token / Key Exposure & Admin Isolation** | Ingress routing is strictly scoped to `/realms/bus-reservation/` and `/resources/`. The `master` realm and Keycloak `/admin` console are completely blocked from the edge. Public client PKCE flows (`/realms/bus-reservation/.../token`) and OIDC discovery (`.well-known`) enforce PKCE SHA-256 challenges (`S256`) with zero static client secrets on the edge. | [`envoy/httproute.yaml`](file:///c:/Personal-Project/microservice-main/microservice-main/envoy/httproute.yaml), [`gateway/application.yml`](file:///c:/Personal-Project/microservice-main/microservice-main/gateway/src/main/resources/application.yml) |
 
 ---
 
@@ -126,7 +127,7 @@ The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Archi
 | Threat Scenario | OmniBus Platform Mitigation | Code & Configuration Reference |
 | :--- | :--- | :--- |
 | **Untrusted Message Payloads** | Asynchronous RabbitMQ messages use structured JSON serialization with Jackson `JavaTimeModule` and typed DTO contracts (`BookingModel`, `PaymentModel`). | [`RabbitMQConfig.java`](file:///c:/Personal-Project/microservice-main/microservice-main/bookingservice/src/main/java/com/da/demo/bookingservice/config/RabbitMQConfig.java) |
-| **M2M Impersonation** | Internal microservice REST calls cannot forge headers; they must supply a valid JWT obtained via OpenFeign's `FeignAuthRequestInterceptor` using Keycloak's Client Credentials Grant. | [`FeignAuthRequestInterceptor.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/feign/FeignAuthRequestInterceptor.java) |
+| **M2M Impersonation** | Internal microservice REST calls cannot forge headers; they must supply a valid `X-Internal-Passport` + `X-Passport-User` minted by `FeignPassportRequestInterceptor` and cryptographically verified by `PassportManager` against 30s rotating Valkey keys. | [`FeignPassportRequestInterceptor.java`](file:///c:/Personal-Project/microservice-main/microservice-main/common-security/src/main/java/com/da/demo/security/passport/FeignPassportRequestInterceptor.java) |
 
 ---
 
@@ -243,7 +244,7 @@ The **OmniBus Cloud-Native Enterprise Platform** adheres to a **Zero-Trust Archi
 │ Token Refresh Race Condition │ Valkey Mutex + Grace Pointer (10s) │ DistributedSessionManager.java (resolveSession)        │
 │ Stolen Refresh Token Replay  │ Keycloak RTR + Revoked Archive     │ keycloak/realm-export.json                             │
 │ Brute Force / Auto Cred Stuff│ Server-Side CAPTCHA + Brute Force  │ ValkeyCaptchaAuthenticator.java & Keycloak Realm       │
-│ Microservice Impersonation   │ M2M Client Credentials Grant       │ FeignAuthRequestInterceptor.java                       │
+│ Microservice Impersonation   │ Ephemeral Valkey Passport (HMAC)   │ FeignPassportRequestInterceptor.java                   │
 │ Gateway Memory Exhaustion    │ 4-Tier Valkey TTL Lifecycle        │ DistributedSessionManager.java                         │
 │ Service Cascading Failures   │ Resilience4j Circuit Breakers      │ BookingController.java                                 │
 │ Gateway Edge Penetration     │ Kubernetes HTTPRoute Whitelist     │ envoy/httproute.yaml                                   │

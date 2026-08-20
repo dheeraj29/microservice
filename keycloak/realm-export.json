@@ -189,7 +189,12 @@
           "http://localhost:8081/*",
           "http://localhost:8082/*",
           "http://localhost:8083/*",
-          "http://localhost:8084/*"
+          "http://localhost:8084/*",
+          "http://127.0.0.1:*",
+          "http://localhost:*",
+          "https://vscode.dev/redirect",
+          "vscode://*",
+          "vscode-insiders://*"
         ],
         "webOrigins": [
           "http://localhost:4200",
@@ -197,7 +202,10 @@
           "http://localhost:8081",
           "http://localhost:8082",
           "http://localhost:8083",
-          "http://localhost:8084"
+          "http://localhost:8084",
+          "http://127.0.0.1",
+          "https://vscode.dev",
+          "+"
         ],
         "attributes": {
           "pkce.code.challenge.method": "S256",
@@ -289,25 +297,6 @@
             }
           }
         ],
-        "defaultClientScopes": [
-          "web-origins",
-          "roles",
-          "profile",
-          "email"
-        ],
-        "optionalClientScopes": []
-      },
-      {
-        "clientId": "internal-backend-client",
-        "name": "OmniBus Internal Microservice Mesh",
-        "enabled": true,
-        "publicClient": false,
-        "clientAuthenticatorType": "client-secret",
-        "secret": "internal-service-mesh-secret-key-123",
-        "serviceAccountsEnabled": true,
-        "standardFlowEnabled": false,
-        "directAccessGrantsEnabled": false,
-        "redirectUris": [],
         "defaultClientScopes": [
           "web-origins",
           "roles",

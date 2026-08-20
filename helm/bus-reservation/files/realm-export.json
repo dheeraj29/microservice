@@ -296,25 +296,6 @@
           "email"
         ],
         "optionalClientScopes": []
-      },
-      {
-        "clientId": "internal-backend-client",
-        "name": "OmniBus Internal Microservice Mesh",
-        "enabled": true,
-        "publicClient": false,
-        "clientAuthenticatorType": "client-secret",
-        "secret": "internal-service-mesh-secret-key-123",
-        "serviceAccountsEnabled": true,
-        "standardFlowEnabled": false,
-        "directAccessGrantsEnabled": false,
-        "redirectUris": [],
-        "defaultClientScopes": [
-          "web-origins",
-          "roles",
-          "profile",
-          "email"
-        ],
-        "optionalClientScopes": []
       }
     ],
     "clientScopes": [

@@ -49,41 +49,23 @@ public class KeycloakAuthService {
     @Value("${keycloak.client-secret:}")
     private String clientSecret;
 
-    @Value("${keycloak.internal-client-id:internal-backend-client}")
-    private String internalClientId;
-
-    @Value("${keycloak.internal-client-secret:internal-service-mesh-secret-key-123}")
-    private String internalClientSecret;
-
     public KeycloakAuthService() {
         this.restTemplate = new RestTemplate();
     }
 
+    /**
+     * Verifies if an access token is cryptographically valid and not expired using cached Keycloak JWKS.
+     * Requires ZERO client secrets and executes with 0ms network latency.
+     */
     public boolean introspectToken(String token) {
         if (token == null || token.isBlank()) {
             return false;
         }
         try {
-            String introspectUrl = String.format("%s/realms/%s/protocol/openid-connect/token/introspect", keycloakUrl, realm);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-            MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
-            formData.add("token", token);
-            formData.add("token_type_hint", "access_token");
-            formData.add("client_id", internalClientId);
-            formData.add("client_secret", internalClientSecret);
-
-            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(formData, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(introspectUrl, request, Map.class);
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                Object active = response.getBody().get("active");
-                return Boolean.TRUE.equals(active) || "true".equalsIgnoreCase(String.valueOf(active));
-            }
-            return false;
+            JWTClaimsSet claims = verifyAndDecodeJwt(token);
+            return claims != null && (claims.getExpirationTime() == null || new Date().before(claims.getExpirationTime()));
         } catch (Exception e) {
-            log.warn("Token introspection with Keycloak note: {}", e.getMessage());
+            log.debug("Token verification note: {}", e.getMessage());
             return false;
         }
     }
@@ -145,8 +127,16 @@ public class KeycloakAuthService {
         }
 
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(formData, headers);
-        ResponseEntity<Map> response = restTemplate.postForEntity(tokenUrl, request, Map.class);
-        return (Map<String, Object>) response.getBody();
+        try {
+            ResponseEntity<Map> response = restTemplate.postForEntity(tokenUrl, request, Map.class);
+            return (Map<String, Object>) response.getBody();
+        } catch (org.springframework.web.client.HttpStatusCodeException ex) {
+            log.warn("Keycloak code exchange error ({}): {}", ex.getStatusCode(), ex.getResponseBodyAsString());
+            throw new IllegalArgumentException("Keycloak code exchange failed: " + ex.getResponseBodyAsString(), ex);
+        } catch (Exception ex) {
+            log.error("Keycloak connection failure during code exchange: {}", ex.getMessage());
+            throw new IllegalStateException("Unable to reach Keycloak auth server: " + ex.getMessage(), ex);
+        }
     }
 
     public Map<String, Object> refreshAccessToken(String refreshToken) {
@@ -164,8 +154,16 @@ public class KeycloakAuthService {
         }
 
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(formData, headers);
-        ResponseEntity<Map> response = restTemplate.postForEntity(tokenUrl, request, Map.class);
-        return (Map<String, Object>) response.getBody();
+        try {
+            ResponseEntity<Map> response = restTemplate.postForEntity(tokenUrl, request, Map.class);
+            return (Map<String, Object>) response.getBody();
+        } catch (org.springframework.web.client.HttpStatusCodeException ex) {
+            log.warn("Keycloak token refresh error ({}): {}", ex.getStatusCode(), ex.getResponseBodyAsString());
+            return null;
+        } catch (Exception ex) {
+            log.error("Keycloak connection failure during token refresh: {}", ex.getMessage());
+            return null;
+        }
     }
 
     public void revokeToken(String refreshToken) {

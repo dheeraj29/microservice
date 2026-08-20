@@ -1,0 +1,95 @@
+admin:
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 9901 }
+
+static_resources:
+  listeners:
+  - name: edge_listener
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 8080 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          stream_idle_timeout: 0s
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          route_config:
+            name: omnibus_routes
+            virtual_hosts:
+            - name: omnibus_services
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/adminservice/" }
+                route: { cluster: adminservice, timeout: 60s }
+              - match: { prefix: "/bookingservice/" }
+                route: { cluster: bookingservice, timeout: 60s }
+              - match: { prefix: "/inventoryservice/" }
+                route: { cluster: inventoryservice, timeout: 60s }
+              - match: { prefix: "/paymentservice/" }
+                route: { cluster: paymentservice, timeout: 60s }
+              - match: { prefix: "/mcp/admin" }
+                route: { cluster: adminservice, timeout: 0s }
+              - match: { prefix: "/mcp/booking" }
+                route: { cluster: bookingservice, timeout: 0s }
+              - match: { prefix: "/mcp/inventory" }
+                route: { cluster: inventoryservice, timeout: 0s }
+              - match: { prefix: "/realms/bus-reservation/" }
+                route: { cluster: keycloak, timeout: 60s }
+              - match: { prefix: "/resources/" }
+                route: { cluster: keycloak, timeout: 60s }
+
+  clusters:
+  - name: adminservice
+    connect_timeout: 2s
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: adminservice
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            socket_address: { address: adminservice, port_value: 8081 }
+
+  - name: bookingservice
+    connect_timeout: 2s
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: bookingservice
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            socket_address: { address: bookingservice, port_value: 8083 }
+
+  - name: inventoryservice
+    connect_timeout: 2s
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: inventoryservice
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            socket_address: { address: inventoryservice, port_value: 8084 }
+
+  - name: paymentservice
+    connect_timeout: 2s
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: paymentservice
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            socket_address: { address: paymentservice, port_value: 8085 }
+
+  - name: keycloak
+    connect_timeout: 2s
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: keycloak
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            socket_address: { address: keycloak, port_value: 8080 }

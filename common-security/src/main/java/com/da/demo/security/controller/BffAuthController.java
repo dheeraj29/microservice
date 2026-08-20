@@ -113,10 +113,27 @@ public class BffAuthController {
      * OAuth2 Authorization Code Callback endpoint.
      */
     @GetMapping("/callback")
-    public ResponseEntity<Map<String, Object>> handleCallback(@RequestParam("code") String code,
+    public ResponseEntity<Map<String, Object>> handleCallback(@RequestParam(value = "code", required = false) String code,
                                                               @RequestParam(value = "state", required = false) String state,
+                                                              @RequestParam(value = "error", required = false) String error,
+                                                              @RequestParam(value = "error_description", required = false) String errorDescription,
                                                               HttpServletRequest request,
                                                               HttpServletResponse response) {
+        if (error != null && !error.isBlank()) {
+            log.warn("OAuth2 callback received error from Keycloak: {} - {}", error, errorDescription);
+            Map<String, Object> errResp = new HashMap<>();
+            errResp.put("authenticated", false);
+            errResp.put("error", errorDescription != null ? errorDescription : error);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errResp);
+        }
+
+        if (code == null || code.isBlank()) {
+            Map<String, Object> errResp = new HashMap<>();
+            errResp.put("authenticated", false);
+            errResp.put("error", "Missing required authorization code");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errResp);
+        }
+
         String callbackUrl = getExactCallbackUrl();
 
         try {

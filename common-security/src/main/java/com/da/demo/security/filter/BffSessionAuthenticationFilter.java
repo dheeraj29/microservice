@@ -34,11 +34,14 @@ public class BffSessionAuthenticationFilter extends OncePerRequestFilter {
 
     private final DistributedSessionManager sessionManager;
     private final com.da.demo.security.service.KeycloakAuthService keycloakAuthService;
+    private final com.da.demo.security.passport.PassportManager passportManager;
 
     public BffSessionAuthenticationFilter(DistributedSessionManager sessionManager,
-                                         com.da.demo.security.service.KeycloakAuthService keycloakAuthService) {
+                                         com.da.demo.security.service.KeycloakAuthService keycloakAuthService,
+                                         com.da.demo.security.passport.PassportManager passportManager) {
         this.sessionManager = sessionManager;
         this.keycloakAuthService = keycloakAuthService;
+        this.passportManager = passportManager;
     }
 
     @Override
@@ -49,12 +52,47 @@ public class BffSessionAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
 
         // 1. Skip actuator and public auth endpoints
-        if (path.startsWith("/actuator/") || path.startsWith("/eureka/")) {
+        if (path.startsWith("/actuator/") || path.startsWith("/eureka/")
+                || path.equals("/auth/login") || path.equals("/auth/callback") || path.equals("/auth/logout")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // 2. Extract session ID from cookie
+        // 2. High-Performance Internal Feign Passport (Zero-Trust Ephemeral Valkey MINT)
+        String passportHeader = request.getHeader(com.da.demo.security.passport.PassportManager.PASSPORT_HEADER);
+        String passportUserHeader = request.getHeader(com.da.demo.security.passport.PassportManager.PASSPORT_USER_HEADER);
+
+        if (passportHeader != null && !passportHeader.isBlank()) {
+            try {
+                com.da.demo.security.passport.PassportManager.PassportRecord record =
+                        passportManager.verifyPassport(passportHeader, passportUserHeader);
+
+                List<SimpleGrantedAuthority> authorities = record.roles().stream()
+                        .map(r -> r.startsWith("ROLE_") ? r : "ROLE_" + r)
+                        .distinct()
+                        .map(SimpleGrantedAuthority::new)
+                        .collect(Collectors.toList());
+
+                UsernamePasswordAuthenticationToken auth =
+                        new UsernamePasswordAuthenticationToken(record.username(), passportHeader, authorities);
+                SecurityContextHolder.getContext().setAuthentication(auth);
+
+                // Convert X-Passport-User to standard internal authenticated attributes
+                request.setAttribute("X-Authenticated-User", record.username());
+                request.setAttribute("X-Caller-App", record.callerAppName());
+
+                log.debug("Authenticated Feign call via X-Internal-Passport from app '{}' for user '{}'",
+                        record.callerAppName(), record.username());
+                filterChain.doFilter(request, response);
+                return;
+            } catch (Exception e) {
+                log.warn("Rejected invalid internal Feign passport: {}", e.getMessage());
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid internal passport signature or expired");
+                return;
+            }
+        }
+
+        // 3. Extract session ID from cookie
         String sessionId = extractSessionIdFromCookies(request);
 
         if (sessionId != null && !sessionId.isBlank()) {

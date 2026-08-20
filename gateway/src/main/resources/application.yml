@@ -63,6 +63,14 @@ spring:
             predicates:
             - Path=/mcp/inventory/**
             uri: lb://inventoryservice
+          - id: keycloak-realm
+            predicates:
+            - Path=/realms/bus-reservation/**
+            uri: http://localhost:8088
+          - id: keycloak-resources
+            predicates:
+            - Path=/resources/**
+            uri: http://localhost:8088
           - id: angular-frontend
             predicates:
             - Path=/**

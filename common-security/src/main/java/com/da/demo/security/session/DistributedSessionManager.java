@@ -20,14 +20,26 @@ public class DistributedSessionManager {
 
     private static final Logger log = LoggerFactory.getLogger(DistributedSessionManager.class);
 
-    private static final Duration SESSION_TTL = Duration.ofMinutes(30);
-    private static final Duration POINTER_TTL = Duration.ofSeconds(10);
-    private static final Duration LOCK_TTL = Duration.ofSeconds(5);
-    private static final Duration ARCHIVE_TTL = Duration.ofHours(1);
+    @org.springframework.beans.factory.annotation.Value("${session.ttl-minutes:30}")
+    private long sessionTtlMinutes = 30L;
+
+    @org.springframework.beans.factory.annotation.Value("${session.rotation.grace-seconds:10}")
+    private long rotationGraceSeconds = 10L;
+
+    @org.springframework.beans.factory.annotation.Value("${session.lock-ttl-seconds:5}")
+    private long lockTtlSeconds = 5L;
+
+    @org.springframework.beans.factory.annotation.Value("${session.archive-ttl-hours:1}")
+    private long archiveTtlHours = 1L;
 
     private final StringRedisTemplate redisTemplate;
     private final KeycloakAuthService keycloakAuthService;
     private final ObjectMapper objectMapper;
+
+    public Duration getSessionTtl() { return Duration.ofMinutes(sessionTtlMinutes); }
+    public Duration getPointerTtl() { return Duration.ofSeconds(rotationGraceSeconds); }
+    public Duration getLockTtl() { return Duration.ofSeconds(lockTtlSeconds); }
+    public Duration getArchiveTtl() { return Duration.ofHours(archiveTtlHours); }
 
     public DistributedSessionManager(StringRedisTemplate redisTemplate,
                                      KeycloakAuthService keycloakAuthService) {
@@ -39,16 +51,25 @@ public class DistributedSessionManager {
     }
 
     public SessionRecord createSession(Map<String, Object> tokenPayload, String clientFingerprint) {
+        if (tokenPayload == null || !tokenPayload.containsKey("access_token")) {
+            throw new IllegalArgumentException("Keycloak token exchange returned empty or invalid response");
+        }
         String sessionId = "sid_" + UUID.randomUUID().toString();
         String accessToken = (String) tokenPayload.get("access_token");
         String refreshToken = (String) tokenPayload.get("refresh_token");
-        Number expiresIn = (Number) tokenPayload.getOrDefault("expires_in", 300);
+        Object rawExpiresIn = tokenPayload.getOrDefault("expires_in", 300);
+        long expiresInSecs = 300L;
+        if (rawExpiresIn instanceof Number) {
+            expiresInSecs = ((Number) rawExpiresIn).longValue();
+        } else if (rawExpiresIn instanceof String) {
+            try { expiresInSecs = Long.parseLong((String) rawExpiresIn); } catch (Exception ignored) {}
+        }
 
         SessionRecord session = new SessionRecord();
         session.setSessionId(sessionId);
         session.setAccessToken(accessToken);
         session.setRefreshToken(refreshToken);
-        session.setAccessTokenExpiresAt(Instant.now().plusSeconds(expiresIn.longValue()));
+        session.setAccessTokenExpiresAt(Instant.now().plusSeconds(expiresInSecs));
         session.setUsername(keycloakAuthService.extractUsernameFromToken(accessToken));
         session.setRoles(keycloakAuthService.extractRolesFromToken(accessToken));
         session.setClientFingerprint(clientFingerprint);
@@ -57,7 +78,7 @@ public class DistributedSessionManager {
         session.setHomepage(keycloakAuthService.extractCustomClaim(accessToken, "homepage", "/booking"));
         session.setTheme(keycloakAuthService.extractCustomClaim(accessToken, "theme", "dark"));
 
-        saveSession(session, sessionId, SESSION_TTL);
+        saveSession(session, sessionId, getSessionTtl());
         return session;
     }
 
@@ -70,7 +91,7 @@ public class DistributedSessionManager {
         if (prefs.containsKey("homepage")) session.setHomepage(prefs.get("homepage"));
         if (prefs.containsKey("theme")) session.setTheme(prefs.get("theme"));
 
-        saveSession(session, sessionId, SESSION_TTL);
+        saveSession(session, sessionId, getSessionTtl());
         return session;
     }
 
@@ -106,7 +127,7 @@ public class DistributedSessionManager {
         try {
             SessionRecord record = objectMapper.readValue(json, SessionRecord.class);
             // Sliding window TTL in Valkey
-            redisTemplate.expire("session:" + sessionId, SESSION_TTL);
+            redisTemplate.expire("session:" + sessionId, getSessionTtl());
             return record;
         } catch (Exception e) {
             log.error("Failed to deserialize SessionRecord for {}: {}", sessionId, e.getMessage());
@@ -120,7 +141,7 @@ public class DistributedSessionManager {
         String lockVal = UUID.randomUUID().toString();
 
         // 1. Distributed Lock in Valkey (SET NX PX 5000)
-        Boolean lockAcquired = redisTemplate.opsForValue().setIfAbsent(lockKey, lockVal, LOCK_TTL);
+        Boolean lockAcquired = redisTemplate.opsForValue().setIfAbsent(lockKey, lockVal, getLockTtl());
 
         if (Boolean.TRUE.equals(lockAcquired)) {
             log.info("Acquired distributed refresh lock for session {}", oldSid);
@@ -170,9 +191,9 @@ public class DistributedSessionManager {
         newSession.setLastValidatedAt(Instant.now());
 
         // Atomic multi-step rotation in Valkey:
-        saveSession(newSession, newSid, SESSION_TTL);
-        redisTemplate.opsForValue().set("pointer:" + oldSid, newSid, POINTER_TTL);
-        redisTemplate.opsForValue().set("revoked_archive:" + oldSid, "rotated", ARCHIVE_TTL);
+        saveSession(newSession, newSid, getSessionTtl());
+        redisTemplate.opsForValue().set("pointer:" + oldSid, newSid, getPointerTtl());
+        redisTemplate.opsForValue().set("revoked_archive:" + oldSid, "rotated", getArchiveTtl());
         redisTemplate.delete("session:" + oldSid);
 
         return newSession;
@@ -211,7 +232,7 @@ public class DistributedSessionManager {
 
                 if (active) {
                     session.setLastValidatedAt(Instant.now());
-                    saveSession(session, sid, SESSION_TTL);
+                    saveSession(session, sid, getSessionTtl());
                     return session;
                 }
 
@@ -222,7 +243,7 @@ public class DistributedSessionManager {
                     if (refreshedSession != null && !refreshedSession.getSessionId().equals(sid)) {
                         log.info("Session auto-healed via refresh token for {}", session.getUsername());
                         refreshedSession.setLastValidatedAt(Instant.now());
-                        saveSession(refreshedSession, refreshedSession.getSessionId(), SESSION_TTL);
+                        saveSession(refreshedSession, refreshedSession.getSessionId(), getSessionTtl());
                         return refreshedSession;
                     }
                 } catch (Exception e) {
@@ -231,7 +252,7 @@ public class DistributedSessionManager {
 
                 // Refresh also failed -> Session was truly revoked by admin / logout in Keycloak
                 log.warn("🚨 Session {} for user {} is REVOKED in Keycloak. Purging from Valkey...", sid, session.getUsername());
-                redisTemplate.opsForValue().set("revoked_archive:" + sid, "revoked_in_keycloak", ARCHIVE_TTL);
+                redisTemplate.opsForValue().set("revoked_archive:" + sid, "revoked_in_keycloak", getArchiveTtl());
                 redisTemplate.delete("session:" + sid);
                 redisTemplate.delete("pointer:" + sid);
                 return null;
