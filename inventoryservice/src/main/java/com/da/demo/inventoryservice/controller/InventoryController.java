@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.loadbalancer.LoadBalancerClient;
@@ -16,6 +16,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,7 +40,8 @@ public class InventoryController {
 	@Autowired
 	BusInventoryService busInventoryService;
 	
-	@Tool(description = "Check seat vacancy and return available bus number operating between cities")
+	@McpTool(description = "Check seat vacancy and return available bus number operating between cities")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 	@Retry(name = "seatsAvailabilityRetry")
 	@CircuitBreaker(name="seatsAvailabilityCB")
 	@GetMapping("/getSeatAvailability")
@@ -64,7 +66,8 @@ public class InventoryController {
 		return 101;
 	}
 
-	@Tool(description = "Retrieve live interactive seat map layout and availability grid for a bus")
+	@McpTool(description = "Retrieve live interactive seat map layout and availability grid for a bus")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 	@GetMapping("/busSeatLayout/{busNumber}")
 	public List<Map<String, Object>> getBusSeatLayout(@PathVariable("busNumber") Integer busNumber) {
 		List<Map<String, Object>> seats = new ArrayList<>();
@@ -94,7 +97,8 @@ public class InventoryController {
 		return seats;
 	}
 	
-	@Tool(description = "Initialize and register seat capacity inventory for a new bus")
+	@McpTool(description = "Initialize and register seat capacity inventory for a new bus")
+	@PreAuthorize("hasRole('ADMIN')")
 	@GetMapping("/addBus")
 	public String saveBusInventory(@RequestParam(name="busNumber",required=true) Integer busNumber,
 			@RequestParam(name="totalSeats",required=true) Integer totalSeats) {

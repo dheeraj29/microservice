@@ -39,9 +39,12 @@ public class CommonSecurityConfig {
                                 "/actuator/health/**",
                                 "/actuator/info",
                                 "/actuator/prometheus",
-                                "/error",
+                                "/actuator/swagger-ui/**",
+                                "/actuator/openapi/**",
                                 "/swagger-ui/**",
-                                "/v3/api-docs/**"
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/error"
                         ).permitAll()
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

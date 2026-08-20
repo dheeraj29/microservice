@@ -5,15 +5,15 @@ metadata:
   namespace: default
 spec:
   parentRefs:
-    - name: omnibus-gateway
+    - name: omnibus-ai-gateway
   path: /mcp
   backendRefs:
     - name: adminservice
       port: 8081
-      path: /mcp/admin
+      path: /mcp/admin/sse
     - name: bookingservice
       port: 8083
-      path: /mcp/booking
+      path: /mcp/booking/sse
     - name: inventoryservice
       port: 8084
-      path: /mcp/inventory
+      path: /mcp/inventory/sse

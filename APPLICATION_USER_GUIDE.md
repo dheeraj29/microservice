@@ -215,10 +215,10 @@ When logged in as `john_doe` (or visiting `/booking`):
 | **Eureka Discovery Dashboard** | [http://localhost:8761](http://localhost:8761) | — | Live heartbeats of all 5 microservices |
 | **Keycloak IAM Admin Console** | [http://localhost:8088/admin](http://localhost:8088/admin) | `admin` / `admin` | Real-time user sessions, RBAC roles, client isolation |
 | **RabbitMQ Management UI** | [http://localhost:15672](http://localhost:15672) | `guest` / `guest` | Live message queues (`booking-queue`, `payment-queue`) |
-| **Admin Service OpenAPI** | [http://localhost:8081/swagger-ui/index.html](http://localhost:8081/swagger-ui/index.html) | — | Interactive REST API testing for Fleet Ops |
-| **Booking Service OpenAPI** | [http://localhost:8083/swagger-ui/index.html](http://localhost:8083/swagger-ui/index.html) | — | Interactive REST API testing for Reservations |
-| **Inventory Service OpenAPI** | [http://localhost:8084/swagger-ui/index.html](http://localhost:8084/swagger-ui/index.html) | — | Interactive REST API testing for Seat Availability |
-| **Payment Service OpenAPI** | [http://localhost:8085/swagger-ui/index.html](http://localhost:8085/swagger-ui/index.html) | — | Interactive REST API testing for Payment Sagas |
+| **Admin Service OpenAPI** | [http://localhost:9081/actuator/swagger-ui](http://localhost:9081/actuator/swagger-ui) | — | Interactive REST API testing for Fleet Ops (Internal Port) |
+| **Booking Service OpenAPI** | [http://localhost:9083/actuator/swagger-ui](http://localhost:9083/actuator/swagger-ui) | — | Interactive REST API testing for Reservations (Internal Port) |
+| **Inventory Service OpenAPI** | [http://localhost:9084/actuator/swagger-ui](http://localhost:9084/actuator/swagger-ui) | — | Interactive REST API testing for Seat Availability (Internal Port) |
+| **Payment Service OpenAPI** | [http://localhost:9085/actuator/swagger-ui](http://localhost:9085/actuator/swagger-ui) | — | Interactive REST API testing for Payment Sagas (Internal Port) |
 
 ---
 
@@ -226,24 +226,29 @@ When logged in as `john_doe` (or visiting `/booking`):
 
 OmniBus exposes its fleet management, booking reservations, and seat inventory capabilities as **Spring AI Model Context Protocol (MCP)** tools for AI assistants (VS Code Copilot, Claude Desktop, Cursor):
 
-### Unified Connection URL:
-* **Gateway Aggregator Endpoint**: `http://localhost:8080/mcp/sse` *(or `http://localhost:8080/mcp`)*
+### Desktop AI Configuration (`mcp.json` / `claude_desktop_config.json`):
+Connect to the Spring AI MCP servers routed through the Gateway:
 
-### Client Configuration (`mcp.json` / `claude_desktop_config.json`):
 ```json
 {
   "mcpServers": {
-    "omnibus-fleet": {
-      "url": "http://localhost:8080/mcp/sse"
+    "omnibus-admin": {
+      "url": "http://localhost:8080/mcp/admin/sse"
+    },
+    "omnibus-booking": {
+      "url": "http://localhost:8080/mcp/booking/sse"
+    },
+    "omnibus-inventory": {
+      "url": "http://localhost:8080/mcp/inventory/sse"
     }
   }
 }
 ```
 
 ### Available AI Agent Tools:
-* **Fleet Management**: `addBusDetails`, `getAllBuses`, `getBusByNumber`, `getStats`, `deleteBus`
-* **Booking Engine**: `bookBusTicket`, `getBookingsByUser`, `getBookingById`, `cancelBooking`
-* **Seat Inventory**: `getAvailableSeats`, `getAvailableBus`, `saveBusSeats`
+* **Fleet Management (`/mcp/admin/sse`)**: `addBusDetails`, `getAllBuses`, `findBusDetailsByNumber`, `findBusDetailsBySourceAndDestination`, `getDashboardStats`, `deleteBusDetails`
+* **Booking Engine (`/mcp/booking/sse`)**: `bookBusTicket`, `getMyBookings`, `getBookingById`, `cancelBooking`
+* **Seat Inventory (`/mcp/inventory/sse`)**: `getSeatAvailability`, `getBusSeatLayout`, `saveBusInventory`
 
 ---
 

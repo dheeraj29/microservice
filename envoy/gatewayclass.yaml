@@ -5,3 +5,11 @@ metadata:
 spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
   description: "Standard Envoy Gateway Controller for Kubernetes Gateway API"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: envoy-ai-gateway
+spec:
+  controllerName: aigateway.envoyproxy.io/gatewayclass-controller
+  description: "Dedicated Envoy AI Gateway Controller for LLM and MCP Traffic"

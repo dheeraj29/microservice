@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.loadbalancer.LoadBalancerClient;
@@ -14,6 +14,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,7 +44,8 @@ public class BookingController {
 	@Autowired(required = false)
 	private RabbitMQProducer rabbitMQProducer;
 	
-	@Tool(description = "Book passenger bus seats and confirm travel reservation")
+	@McpTool(description = "Book passenger bus seats and confirm travel reservation")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 	@Retry(name="seatsCheckRetry")
 	@CircuitBreaker(name="seatsCheckCB")
 	@PostMapping("/bookSeat")
@@ -94,7 +96,8 @@ public class BookingController {
 		return ResponseEntity.ok(bookedModel != null ? bookedModel : bookingModel);
 	}
 
-	@Tool(description = "Retrieve list of all active and past bookings for a passenger username")
+	@McpTool(description = "Retrieve list of all active and past bookings for a passenger username")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 	@GetMapping("/myBookings")
 	public List<BookingModel> getMyBookings(
 			@RequestParam(name="username", required=false) String username,
@@ -110,7 +113,8 @@ public class BookingController {
 		return bookings != null ? bookings : new ArrayList<>();
 	}
 
-	@Tool(description = "Get detailed booking information and ticket status by numeric booking ID")
+	@McpTool(description = "Get detailed booking information and ticket status by numeric booking ID")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 	@GetMapping("/booking/{id}")
 	public ResponseEntity<BookingModel> getBookingById(@PathVariable("id") Integer id) {
 		BookingModel model = bookingService.findById(id);
@@ -120,7 +124,8 @@ public class BookingController {
 		return ResponseEntity.notFound().build();
 	}
 
-	@Tool(description = "Cancel an existing passenger booking and release reserved seats")
+	@McpTool(description = "Cancel an existing passenger booking and release reserved seats")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 	@PostMapping("/cancelBooking")
 	public ResponseEntity<String> cancelBooking(
 			@RequestParam(name="bookingNumber", required=false) Integer bookingNumber,

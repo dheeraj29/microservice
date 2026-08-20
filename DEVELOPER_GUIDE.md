@@ -428,7 +428,25 @@ public class FeignPassportRequestInterceptor implements RequestInterceptor {
 
 ---
 
-## 7. OpenAPI 3.0 & Swagger UI Security
+## 7. OpenAPI 3.0, Swagger UI & Management Port Isolation
+ 
+To protect internal administrative and observational interfaces from public exposure, OmniBus isolates **Spring Boot Actuator** and **SpringDoc Swagger UI** onto dedicated internal management ports:
+
+```properties
+# Dedicated Management Port for Actuator & Swagger
+management.server.port=9081
+springdoc.use-management-port=true
+management.endpoints.web.exposure.include=health,info,prometheus,openapi,swagger-ui
+management.endpoint.health.show-details=always
+```
+
+* **Main Application Port (`8081`, `8083`, `8084`)**:
+  * Exposes only business APIs (`/adminservice/v1/**`, etc.) and MCP Streamable HTTP (`/mcp/**`).
+  * Accessing `/swagger-ui.html` returns `404 Not Found`.
+  * Accessing `/actuator/**` returns `401 Unauthorized`.
+* **Internal Management Port (`9081`, `9083`, `9084`)**:
+  * Bound for internal ops and developers (`/actuator/health`, `/actuator/prometheus`).
+  * Houses the interactive Swagger UI (`/actuator/swagger-ui`) and OpenAPI documentation schema (`/actuator/openapi`).
 
 Swagger UI integrates with Keycloak using **OAuth 2.0 Authorization Code Flow + PKCE** and **Direct Bearer Token**:
 
@@ -561,22 +579,41 @@ metadata:
   namespace: default
 spec:
   parentRefs:
-    - name: omnibus-gateway
+    - name: omnibus-ai-gateway
   path: /mcp
   backendRefs:
     - name: adminservice
       port: 8081
-      path: /mcp/admin
+      path: /mcp/admin/sse
     - name: bookingservice
       port: 8083
-      path: /mcp/booking
+      path: /mcp/booking/sse
     - name: inventoryservice
       port: 8084
-      path: /mcp/inventory
+      path: /mcp/inventory/sse
 ```
 
-* **Unified LLM Ingress**: External AI assistants (Claude Desktop, Cursor, VS Code Copilot) connect to a single endpoint (`https://api.omnibus.com/mcp` in Kubernetes, or `http://localhost:8080/mcp/sse` in local dev).
-* **Declarative Aggregation**: Envoy AI Gateway (in Kubernetes) and [`GatewayMcpAggregatorController`](file:///c:/Personal-Project/microservice-main/microservice-main/gateway/src/main/java/com/da/demo/gateway/mcp/GatewayMcpAggregatorController.java) (in Spring Cloud Gateway) automatically aggregate tool manifests and route execution requests across `adminservice:8081`, `bookingservice:8083`, and `inventoryservice:8084`.
+### 🧠 Why Envoy AI Gateway Is Used (Architectural Benefits)
+
+OmniBus separates standard web ingress from AI agent traffic by deploying **Envoy AI Gateway** alongside **Envoy Gateway**:
+
+#### 🌟 Top 5 Benefits of Envoy AI Gateway:
+
+1. **Zero JVM Startup Coupling & Crash Immunity**:
+   * Traditional Spring Boot in-process aggregation requires eager `listTools().block(20s)` calls during startup. If any downstream service is restarting, the entire gateway crashes with `TimeoutException`.
+   * **Envoy AI Gateway runs outside the JVM lifecycle** (native proxy binary) and resolves MCP tools asynchronously with active health checking.
+2. **Unified Edge Aggregation**:
+   * Instead of forcing AI assistants (Goose, Cursor, VS Code Copilot) to manage 3+ separate server connections, Envoy AI Gateway aggregates all decentralized domain tools into **one single MCP endpoint (`http://localhost:8080/mcp`)**.
+3. **Native Streamable HTTP & SSE Multiplexing**:
+   * Modern MCP uses long-lived HTTP POST/SSE sessions. Envoy AI Gateway natively handles non-blocking streaming with `timeout: 0s`, eliminating connection dropouts.
+4. **AI-Specific Telemetry & Rate Limiting**:
+   * Provides LLM token accounting, tool invocation metrics, and prompt rate limiting that standard API gateways cannot inspect.
+5. **Clean Separation of Concerns**:
+   * Standard web & REST traffic is governed by **Envoy Gateway** (`HTTPRoute`); AI agent tools and Model Context Protocol streams are governed by **Envoy AI Gateway** (`MCPRoute`).
+
+#### 🛠️ Local Development vs. Production Deployment:
+* **Local Development**: AI clients connect directly to the decentralized endpoints (`/mcp/admin/sse`, `/mcp/booking/sse`, `/mcp/inventory/sse`) via the Spring Cloud Gateway router.
+* **Kubernetes / Production**: The **Envoy AI Gateway Controller** aggregates all 3 upstreams into a unified `/mcp` virtual endpoint via `MCPRoute`.
 
 ### 🔐 Keycloak Dynamic Client Registration (RFC 7591 & RFC 8252)
 
@@ -770,18 +807,18 @@ export const loginInterceptor: HttpInterceptorFn = (req, next) => {
 
 ## 13. Microservices Port & Endpoint Reference Matrix
 
-| Service | Port | Base Path | Core Endpoints & Responsibilities |
-| :--- | :--- | :--- | :--- |
-| **API Gateway** | `8080` | `/` | 100% Pure Ingress Routing (`/adminservice/**`, `/bookingservice/**`, `/auth/**`, `/**`) |
-| **Admin Service** | `8081` | `/adminservice/v1` | `/addBusDetails`, `/allBuses`, `/dashboardStats`, `/findBusDetailsByNumber`, `/auth/**` |
-| **Booking Service**| `8083` | `/bookingservice/v1`| `/bookSeat`, `/getBookingHistory`, `/cancelBooking` |
-| **Inventory Service**| `8084`| `/inventoryservice/v1`| `/seatAvailability`, `/reserveSeat`, `/releaseSeat` |
-| **Payment Service** | `8085` | `/paymentservice/v1`| `/processPayment`, `/paymentStatus`, `/refundPayment` |
-| **Keycloak IAM** | `8088` | `/realms/bus-reservation` | OAuth 2.1 Identity Provider, Azure Entra ID Broker, Token Minting |
-| **Netflix Eureka** | `8761` | `/eureka` | Service Discovery & Registration Registry |
-| **Valkey OSS** | `6379` | `localhost:6379` | Distributed Session Store & M2M Token Cache |
-| **RabbitMQ** | `5672` | `localhost:5672` | Event Streaming Broker (Management UI: `15672`) |
-| **Angular Frontend**| `4200` | `/` | Customer Reservation UI, Admin Fleet Portal, `/login` & `/logout` |
+| Service | App / MCP Port | Management Port (Actuator / Swagger) | Base Path | Core Endpoints & Responsibilities |
+| :--- | :--- | :--- | :--- | :--- |
+| **API Gateway** | `8080` | — | `/` | 100% Pure Ingress Routing (`/adminservice/**`, `/bookingservice/**`, `/auth/**`, `/mcp/**`) |
+| **Admin Service** | `8081` | `9081` | `/adminservice/v1` | `/addBusDetails`, `/allBuses`, `/dashboardStats`, `/findBusDetailsByNumber`, `/mcp/admin/sse` |
+| **Booking Service**| `8083` | `9083` | `/bookingservice/v1`| `/bookSeat`, `/myBookings`, `/booking/{id}`, `/cancelBooking`, `/mcp/booking/sse` |
+| **Inventory Service**| `8084`| `9084`| `/inventoryservice/v1`| `/getSeatAvailability`, `/busSeatLayout/{busNumber}`, `/addBus`, `/mcp/inventory/sse` |
+| **Payment Service** | `8085` | `9085` | `/paymentservice/v1`| `/processPayment`, `/paymentStatus`, `/refundPayment` |
+| **Keycloak IAM** | `8088` | — | `/realms/bus-reservation` | OAuth 2.1 Identity Provider, Azure Entra ID Broker, Token Minting |
+| **Netflix Eureka** | `8761` | — | `/eureka` | Service Discovery & Registration Registry |
+| **Valkey OSS** | `6379` | — | `localhost:6379` | Distributed Session Store & M2M Token Cache |
+| **RabbitMQ** | `5672` | `15672` | `localhost:5672` | Event Streaming Broker (Management UI: `15672`) |
+| **Angular Frontend**| `4200` | — | `/` | Customer Reservation UI, Admin Fleet Portal, `/login` & `/logout` |
 
 ---
 

@@ -27,5 +27,9 @@ spec:
       - Content-Type
       - Range
       - Authorization
+      - Mcp-Session-Id
+    exposeHeaders:
+      - Mcp-Session-Id
+      - Set-Cookie
     allowCredentials: true
     maxAge: 86400s

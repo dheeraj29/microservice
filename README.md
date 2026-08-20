@@ -75,20 +75,20 @@ OmniBus implements the **IETF OAuth 2.0 Security Best Current Practice (BCP)** u
 
 ## 📂 Microservices & Library Portfolio
 
-| Service / Module | Port | Tech Stack | Core Responsibilities | Interactive Docs |
-| :--- | :--- | :--- | :--- | :--- |
-| **`common-security`** | *(Library)* | Spring Boot MVC + Valkey | Decentralized Embedded BFF Filter, Session Manager, Token Refresher | — |
-| **`keycloak-captcha-spi`** | *(Plugin)* | Java 21 + Keycloak SPI | Server-side cryptographic CAPTCHA Authenticator SPI plugin | — |
-| **`gateway`** | `8080` | Spring Cloud Gateway | 100% Stateless Pure L7 Reverse Proxy, URL Dispatch, Global CORS | — |
-| **`adminservice`** | `8081` | Spring Boot 3.5.16 + Java 21 | Fleet operations, coach CRUD, pricing, route schedules, revenue KPI | [Swagger UI](http://localhost:8081/swagger-ui/index.html) |
-| **`bookingservice`** | `8083` | Spring Boot 3.5.16 + Java 21 | Ticket reservations, cancellation, user booking history | [Swagger UI](http://localhost:8083/swagger-ui/index.html) |
-| **`inventoryservice`** | `8084` | Spring Boot 3.5.16 + Java 21 | Interactive 2x2 seat cabin layout, real-time seat lock, availability | [Swagger UI](http://localhost:8084/swagger-ui/index.html) |
-| **`paymentservice`** | `8085` | Spring Boot 3.5.16 + Java 21 | Distributed saga payment processing, asynchronous event listener | [Swagger UI](http://localhost:8085/swagger-ui/index.html) |
-| **`service-registry`** | `8761` | Netflix Eureka | Dynamic microservice discovery and heartbeat health monitoring | [Dashboard](http://localhost:8761) |
-| **`keycloak`** | `8088` | Keycloak 26.7.1 IAM | OpenID Connect Identity Provider, RBAC roles (`ADMIN`, `USER`) | [Admin Console](http://localhost:8088/admin) |
-| **`valkey`** | `6379` | Valkey 9.1.1 Alpine | Distributed concurrency mutex, zero-parsing session cache | — |
-| **`rabbitmq`** | `5672` / `15672` | RabbitMQ 3 Management | Asynchronous message bus, saga choreography, event queues | [Management UI](http://localhost:15672) |
-| **`angularplay`** | `4200` | Angular 21 + Signals | Responsive Single Page App, 2x2 seat picker, digital boarding passes | [Web UI](http://localhost:4200) |
+| Service / Module | App / MCP Port | Management Port (Actuator / Swagger) | Tech Stack | Core Responsibilities | Interactive Docs |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **`common-security`** | *(Library)* | — | Spring Boot MVC + Valkey | Decentralized Embedded BFF Filter, Session Manager, Token Refresher | — |
+| **`keycloak-captcha-spi`** | *(Plugin)* | — | Java 21 + Keycloak SPI | Server-side cryptographic CAPTCHA Authenticator SPI plugin | — |
+| **`gateway`** | `8080` | — | Spring Cloud Gateway | 100% Stateless Pure L7 Reverse Proxy, URL Dispatch, Global CORS | — |
+| **`adminservice`** | `8081` | `9081` | Spring Boot 3.5.16 + Java 21 | Fleet operations, coach CRUD, pricing, route schedules, revenue KPI | [Swagger UI](http://localhost:9081/actuator/swagger-ui) |
+| **`bookingservice`** | `8083` | `9083` | Spring Boot 3.5.16 + Java 21 | Ticket reservations, cancellation, user booking history | [Swagger UI](http://localhost:9083/actuator/swagger-ui) |
+| **`inventoryservice`** | `8084` | `9084` | Spring Boot 3.5.16 + Java 21 | Interactive 2x2 seat cabin layout, real-time seat lock, availability | [Swagger UI](http://localhost:9084/actuator/swagger-ui) |
+| **`paymentservice`** | `8085` | `9085` | Spring Boot 3.5.16 + Java 21 | Distributed saga payment processing, asynchronous event listener | [Swagger UI](http://localhost:9085/actuator/swagger-ui) |
+| **`service-registry`** | `8761` | — | Netflix Eureka | Dynamic microservice discovery and heartbeat health monitoring | [Dashboard](http://localhost:8761) |
+| **`keycloak`** | `8088` | — | Keycloak 26.7.1 IAM | OpenID Connect Identity Provider, RBAC roles (`ADMIN`, `USER`) | [Admin Console](http://localhost:8088/admin) |
+| **`valkey`** | `6379` | — | Valkey 9.1.1 Alpine | Distributed concurrency mutex, zero-parsing session cache | — |
+| **`rabbitmq`** | `5672` | `15672` | RabbitMQ 3 Management | Asynchronous message bus, saga choreography, event queues | [Management UI](http://localhost:15672) |
+| **`angularplay`** | `4200` | — | Angular 21 + Signals | Responsive Single Page App, 2x2 seat picker, digital boarding passes | [Web UI](http://localhost:4200) |
 
 ---
 
@@ -138,13 +138,28 @@ stop-all.bat
 
 ## 🤖 Model Context Protocol (MCP) & Envoy AI Gateway 1.0.0
 
-OmniBus exposes **Decentralized Domain-Driven MCP Servers** using **Spring AI 2.0.0** allowing autonomous LLM agents (Claude Desktop, Cursor, LangChain) to discover and execute transport operations:
+OmniBus exposes **Modern Streamable HTTP MCP Servers** using **Spring AI 2.0.0** allowing autonomous LLM agents (Goose, VS Code Copilot, Claude Desktop, Cursor) to discover and execute transport operations over standard HTTP POST and SSE sessions:
 
-| MCP Domain | Transport Protocol | SSE Handshake Stream | Tool Execution Endpoint | Required Role |
-| :--- | :--- | :--- | :--- | :--- |
-| **Admin Fleet Operations** | SSE + JSON-RPC | `GET /mcp/admin/sse` | `POST /mcp/admin/message` | `ROLE_ADMIN` |
-| **Passenger Booking & Saga** | SSE + JSON-RPC | `GET /mcp/booking/sse` | `POST /mcp/booking/message` | `ROLE_USER` / `ROLE_ADMIN` |
-| **Seat Inventory & Layout** | SSE + JSON-RPC | `GET /mcp/inventory/sse` | `POST /mcp/inventory/message` | `ROLE_USER` / `ROLE_ADMIN` |
+| MCP Domain | Transport Protocol | Streamable HTTP Endpoint | Required Role (Method Security) |
+| :--- | :--- | :--- | :--- |
+| **Admin Fleet Operations** | Streamable HTTP | `POST /mcp/admin/sse` | `ROLE_USER` (Read: `getAllBuses`), `ROLE_ADMIN` (CRUD: `addBusDetails`) |
+| **Passenger Booking & Saga** | Streamable HTTP | `POST /mcp/booking/sse` | `ROLE_USER` / `ROLE_ADMIN` (`bookSeat`, `getMyBookings`, `cancelBooking`) |
+| **Seat Inventory & Layout** | Streamable HTTP | `POST /mcp/inventory/sse` | `ROLE_USER` / `ROLE_ADMIN` (`getSeatAvailability`, `getBusSeatLayout`) |
+
+### 🔒 MCP Security & RBAC Enforcement:
+* **Tool Discovery (`tools/list`)**: Permitted at the HTTP transport layer so AI clients can inspect capability schemas.
+* **Tool Invocation (`tools/call`)**: Gated by Spring Method Security (`@PreAuthorize`). Unauthenticated calls are strictly rejected with `Access Denied`.
+* **Zero-Trust Token Validation**: Callers must provide a cryptographically verified `Authorization: Bearer <jwt>` or session cookie. Plain-text header spoofing is rejected.
+
+```yaml
+# Example Goose Extension Config (config.yaml)
+extensions:
+  omnibusadmin:
+    type: streamable_http
+    uri: http://localhost:8080/mcp/admin/sse
+    headers:
+      Authorization: "Bearer <your-keycloak-user-jwt>"
+```
 
 * **Envoy AI Gateway (v1alpha1 API)**: Configured using the official [`aigateway.envoyproxy.io/v1alpha1` `MCPRoute`](file:///c:/Personal-Project/microservice-main/microservice-main/envoy/mcproute.yaml) CRD to aggregate multi-service MCP backends into a unified edge endpoint (`/mcp`).
 
