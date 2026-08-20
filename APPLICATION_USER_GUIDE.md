@@ -222,6 +222,31 @@ When logged in as `john_doe` (or visiting `/booking`):
 
 ---
 
+## 6. 🤖 AI Model Context Protocol (MCP) Integration
+
+OmniBus exposes its fleet management, booking reservations, and seat inventory capabilities as **Spring AI Model Context Protocol (MCP)** tools for AI assistants (VS Code Copilot, Claude Desktop, Cursor):
+
+### Unified Connection URL:
+* **Gateway Aggregator Endpoint**: `http://localhost:8080/mcp/sse` *(or `http://localhost:8080/mcp`)*
+
+### Client Configuration (`mcp.json` / `claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "omnibus-fleet": {
+      "url": "http://localhost:8080/mcp/sse"
+    }
+  }
+}
+```
+
+### Available AI Agent Tools:
+* **Fleet Management**: `addBusDetails`, `getAllBuses`, `getBusByNumber`, `getStats`, `deleteBus`
+* **Booking Engine**: `bookBusTicket`, `getBookingsByUser`, `getBookingById`, `cancelBooking`
+* **Seat Inventory**: `getAvailableSeats`, `getAvailableBus`, `saveBusSeats`
+
+---
+
 ### 🚀 Starting the Platform:
 To launch all services with 1 command:
 ```bash

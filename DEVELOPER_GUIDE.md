@@ -575,10 +575,23 @@ spec:
       path: /mcp/inventory
 ```
 
-* **Unified LLM Ingress**: External AI assistants (Claude Desktop, Cursor, LangChain agents) connect to a single endpoint (`https://api.omnibus.com/mcp`).
-* **Declarative Aggregation**: Envoy AI Gateway automatically aggregates tool manifests and routes execution requests to `adminservice`, `bookingservice`, and `inventoryservice`.
+* **Unified LLM Ingress**: External AI assistants (Claude Desktop, Cursor, VS Code Copilot) connect to a single endpoint (`https://api.omnibus.com/mcp` in Kubernetes, or `http://localhost:8080/mcp/sse` in local dev).
+* **Declarative Aggregation**: Envoy AI Gateway (in Kubernetes) and [`GatewayMcpAggregatorController`](file:///c:/Personal-Project/microservice-main/microservice-main/gateway/src/main/java/com/da/demo/gateway/mcp/GatewayMcpAggregatorController.java) (in Spring Cloud Gateway) automatically aggregate tool manifests and route execution requests across `adminservice:8081`, `bookingservice:8083`, and `inventoryservice:8084`.
 
-* **Module**: [`keycloak-captcha-spi`](file:///c:/Personal-Project/microservice-main/microservice-main/keycloak-captcha-spi/) (`ValkeyCaptchaAuthenticator.java` & `ValkeyClient.java`)
+### 🔐 Keycloak Dynamic Client Registration (RFC 7591 & RFC 8252)
+
+OmniBus supports native desktop AI tooling (VS Code, Claude Desktop, Cursor) through automated **Dynamic Client Registration (RFC 7591)** combined with **PKCE SHA-256 (RFC 7636)**:
+
+* **Discovery**: `.well-known/openid-configuration` advertises `"registration_endpoint"` pointing to Keycloak's `/clients-registrations/openid-connect`.
+* **Zero-Touch Setup**: Native IDEs register their ephemeral loopback redirect URIs (`http://127.0.0.1:*`, `https://vscode.dev/redirect`) dynamically with `token_endpoint_auth_method: none`.
+* **5 Security Guardrails**:
+  1. **Max Client Throttling**: `max-clients: 200` protects against database spam and DoS.
+  2. **Allowed Protocol Mappers**: Restricts custom claim mappers to standard OIDC and SAML mappers.
+  3. **Allowed Client Scopes**: Restricts dynamically created clients to standard user scopes (`email`, `profile`, `roles`, `web-origins`, `offline_access`), preventing elevation to administrative scopes.
+  4. **Full Scope Disabled**: Dynamically registered clients cannot inherit unassigned realm roles.
+  5. **Mandatory PKCE (`S256`)**: Token issuance strictly requires an interactive user login and cryptographically verified PKCE challenge.
+
+### 🛡️ Distributed Captcha & Anti-Automation SPI ([`keycloak-captcha-spi`](file:///c:/Personal-Project/microservice-main/microservice-main/keycloak-captcha-spi/))
 * **Multi-Instance / Cluster Synchronization**:
   * **Valkey Cluster Secret Sync**: The cluster-wide rotating HMAC secret is shared across all Keycloak instances via Valkey (`keycloak:captcha:cluster_secret`) or external environment variable `KEYCLOAK_CAPTCHA_SECRET`. Any Keycloak instance can generate a challenge, and any other instance can validate it.
   * **Distributed Single-Use Replay Protection**: Token signatures are atomically recorded in Valkey upon submission (`SET captcha:used:<sig> 1 EX 120 NX`), ensuring an attacker cannot replay a captured CAPTCHA token to bypass verification on another pod.

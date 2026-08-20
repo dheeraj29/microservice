@@ -2,6 +2,103 @@
     "id":  "e0c46d1b-f67e-45a7-a418-8ade8df10a87",
     "realm":  "bus-reservation",
     "displayName":  "Bus Reservation Identity System",
+    "components": {
+      "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy": [
+        {
+          "id": "92e13c35-67aa-4f58-9a64-06120bbc46cd",
+          "name": "Allowed Client Scopes",
+          "providerId": "allowed-client-templates",
+          "subType": "anonymous",
+          "subComponents": {},
+          "config": {
+            "allow-default-scopes": ["true"],
+            "allowed-client-scopes": ["email", "profile", "offline_access", "openid", "web-origins", "roles"]
+          }
+        },
+        {
+          "id": "62fb8c7d-5feb-48da-81b0-2a0edcc095e5",
+          "name": "Allowed Registration Web Origins",
+          "providerId": "registration-web-origins",
+          "subType": "anonymous",
+          "subComponents": {},
+          "config": {}
+        },
+        {
+          "id": "fda413e3-2366-4895-bf84-3227be56b42a",
+          "name": "Allowed Client Scopes",
+          "providerId": "allowed-client-templates",
+          "subType": "authenticated",
+          "subComponents": {},
+          "config": {
+            "allow-default-scopes": ["true"]
+          }
+        },
+        {
+          "id": "ec1c35d6-3580-41fd-823f-ca2100015512",
+          "name": "Allowed Protocol Mapper Types",
+          "providerId": "allowed-protocol-mappers",
+          "subType": "authenticated",
+          "subComponents": {},
+          "config": {
+            "allowed-protocol-mapper-types": [
+              "oidc-sha256-pairwise-sub-mapper",
+              "saml-user-property-mapper",
+              "oidc-usermodel-property-mapper",
+              "oidc-address-mapper",
+              "saml-user-attribute-mapper",
+              "oidc-full-name-mapper",
+              "saml-role-list-mapper",
+              "oidc-usermodel-attribute-mapper"
+            ]
+          }
+        },
+        {
+          "id": "f38ab4c4-502d-4ca2-ad95-3a5f76ac10d0",
+          "name": "Full Scope Disabled",
+          "providerId": "scope",
+          "subType": "anonymous",
+          "subComponents": {},
+          "config": {}
+        },
+        {
+          "id": "2885c762-0844-434a-9b8e-b7ee71be5dd2",
+          "name": "Allowed Registration Web Origins",
+          "providerId": "registration-web-origins",
+          "subType": "authenticated",
+          "subComponents": {},
+          "config": {}
+        },
+        {
+          "id": "b4a7b172-6885-4d0d-9827-28bcdec933c2",
+          "name": "Allowed Protocol Mapper Types",
+          "providerId": "allowed-protocol-mappers",
+          "subType": "anonymous",
+          "subComponents": {},
+          "config": {
+            "allowed-protocol-mapper-types": [
+              "saml-user-attribute-mapper",
+              "oidc-full-name-mapper",
+              "oidc-usermodel-attribute-mapper",
+              "oidc-address-mapper",
+              "saml-user-property-mapper",
+              "oidc-usermodel-property-mapper",
+              "oidc-sha256-pairwise-sub-mapper",
+              "saml-role-list-mapper"
+            ]
+          }
+        },
+        {
+          "id": "b58aa079-d3f8-47a2-b665-839b42a4c38e",
+          "name": "Max Clients Limit",
+          "providerId": "max-clients",
+          "subType": "anonymous",
+          "subComponents": {},
+          "config": {
+            "max-clients": ["200"]
+          }
+        }
+      ]
+    },
     "notBefore":  0,
     "defaultSignatureAlgorithm":  "RS256",
     "revokeRefreshToken":  false,
